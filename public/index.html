@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta name="description" content="Konoha Notes — Seal your thoughts. A Naruto-themed note-taking app for shinobi who guard their secrets."/>
+<meta property="og:title" content="Konoha Notes — Seal Your Secrets"/>
+<meta property="og:description" content="A cinematic note-taking app. Create, organize, and seal your scrolls under the Will of Fire."/>
+<title>Konoha Notes — Seal Your Secrets</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Noto+Serif+JP:wght@300;400;700&display=swap" rel="stylesheet"/>
+
+
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+<base target="_blank">
+  <link rel="stylesheet" href="assets/css/app.css?v=20261005-3">
+</head>
+<body>
+<!-- INTRO SEQUENCE -->
+<div id="introOverlay" class="intro-overlay">
+  <!-- Background darkness with pulsing radial gradient -->
+  <div class="intro-darkness"></div>
+
+  <!-- Floating ember particles container -->
+  <div class="intro-fire-particles" id="introFireParticles"></div>
+
+  <!-- Light burst from behind the scroll -->
+  <div class="intro-light-burst" id="introLightBurst"></div>
+
+  <!-- Chakra glow that leaks from the center crack -->
+  <div class="intro-crack-glow" id="introCrackGlow"></div>
+
+  <!-- The scroll itself -->
+  <div class="intro-scroll-container" id="introScrollContainer">
+    <div class="intro-scroll-left-roll" id="introLeftRoll"></div>
+
+    <div class="intro-scroll-paper-wrapper" id="introScrollPaper">
+      <div class="intro-scroll-paper-left" id="introPaperLeft">
+        <div class="intro-scroll-texture"></div>
+      </div>
+      <div class="intro-scroll-paper-right" id="introPaperRight">
+        <div class="intro-scroll-texture"></div>
+      </div>
+      <div class="intro-crack" id="introCrack"></div>
+
+      <div class="intro-scroll-content">
+        <div class="intro-title-line">
+          <span class="intro-title-char" id="introTitle"></span>
+          <span class="intro-cursor">|</span>
+        </div>
+        <div class="intro-subtitle-line">
+          <span class="intro-subtitle-char" id="introSubtitle"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="intro-scroll-right-roll" id="introRightRoll"></div>
+  </div>
+</div>
+<div class="page-transition" id="pageTransition"></div>
+
+<div id="toast-container"></div>
+
+<!-- DELETE MODAL -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <h3>Seal &amp; Destroy?</h3>
+    <p>This scroll will be burned and unsealed forever. Even the Hokage cannot reverse this jutsu.</p>
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeDeleteModal()">Cancel</button>
+      <button class="modal-btn confirm" onclick="confirmDelete()">Destroy</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav id="nav">
+  <button class="nav-logo" onclick="handleLogoClick()">
+    <svg class="nav-logo-icon" viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="45" stroke="#C0392B" stroke-width="2"/>
+      <circle cx="50" cy="50" r="12" fill="#C0392B"/>
+      <path d="M50 5 Q65 25 50 38 Q35 25 50 5Z" fill="#C0392B"/>
+      <path d="M50 5 Q65 25 50 38 Q35 25 50 5Z" fill="#C0392B" transform="rotate(120,50,50)"/>
+      <path d="M50 5 Q65 25 50 38 Q35 25 50 5Z" fill="#C0392B" transform="rotate(240,50,50)"/>
+      <circle cx="50" cy="50" r="6" fill="#0A0A0E"/>
+    </svg>
+    Konoha Notes
+  </button>
+
+  <div class="nav-links" id="navLinks">
+    <button class="nav-btn" onclick="navToHome('features')" id="navFeatures">Features</button>
+    <button class="nav-btn" onclick="navToHome('history')" id="navHistory">History</button>
+    <button class="nav-btn" onclick="navToHome('clans')" id="navClans">Clans</button>
+    <button class="nav-btn" onclick="navToHome('legends')" id="navLegends">Legends</button>
+    <button class="nav-btn primary" onclick="showView('auth','register')" id="registerNavBtn">Register</button>
+    <button class="nav-btn" onclick="showView('profile')" id="profileBtn" style="display:none">Profile</button>
+    <button class="nav-btn primary" onclick="openNotesFromNav()" id="notesBtn" style="display:none">My Scroll</button>
+    <button class="nav-btn" onclick="showView('settings')" id="settingsBtn" style="display:none">Settings</button>
+  </div>
+
+  <!-- Mobile Menu Toggle — Kunai Dagger -->
+  <button class="kunai-toggle" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+    <svg class="kunai-blade" viewBox="0 0 48 48" fill="none">
+      <!-- Blade -->
+      <path d="M24 4 L34 24 L24 20 L14 24 Z" fill="url(#bladeGrad)" stroke="#C0392B" stroke-width="0.8"/>
+      <!-- Handle wrap -->
+      <rect x="21" y="20" width="6" height="14" rx="1" fill="#1a1a2e" stroke="#C0392B" stroke-width="0.5"/>
+      <!-- Handle rings -->
+      <line x1="21" y1="24" x2="27" y2="24" stroke="#C0392B" stroke-width="0.5" opacity="0.6"/>
+      <line x1="21" y1="28" x2="27" y2="28" stroke="#C0392B" stroke-width="0.5" opacity="0.6"/>
+      <line x1="21" y1="32" x2="27" y2="32" stroke="#C0392B" stroke-width="0.5" opacity="0.6"/>
+      <!-- Pommel ring -->
+      <circle cx="24" cy="36" r="3" fill="none" stroke="#C0392B" stroke-width="0.8"/>
+      <circle cx="24" cy="36" r="1" fill="#C0392B"/>
+      <!-- Chakra glow -->
+      <circle cx="24" cy="14" r="8" fill="url(#chakraGlow)" opacity="0.3"/>
+      <defs>
+        <linearGradient id="bladeGrad" x1="24" y1="4" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#E8E8E8"/>
+          <stop offset="50%" stop-color="#B8B8B8"/>
+          <stop offset="100%" stop-color="#C0392B"/>
+        </linearGradient>
+        <radialGradient id="chakraGlow" cx="24" cy="14" r="8" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#FF4500" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#C0392B" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+    </svg>
+    <!-- X marks for close state -->
+    <span class="kunai-x">
+      <span class="x-line x1"></span>
+      <span class="x-line x2"></span>
+    </span>
+    <!-- Chakra particles -->
+    <span class="chakra-particle p1"></span>
+    <span class="chakra-particle p2"></span>
+    <span class="chakra-particle p3"></span>
+  </button>
+</nav>
+
+<!-- Mobile Menu Overlay -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu-backdrop" onclick="toggleMobileMenu()"></div>
+  <div class="mobile-menu-panel">
+    <div class="mobile-menu-header">
+      <div class="mobile-menu-brand">
+        <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+          <circle cx="50" cy="50" r="45" stroke="#C0392B" stroke-width="2"/>
+          <circle cx="50" cy="50" r="12" fill="#C0392B"/>
+          <path d="M50 5 Q65 25 50 38 Q35 25 50 5Z" fill="#C0392B"/>
+          <path d="M50 5 Q65 25 50 38 Q35 25 50 5Z" fill="#C0392B" transform="rotate(120,50,50)"/>
+          <path d="M50 5 Q65 25 50 38 Q35 25 50 5Z" fill="#C0392B" transform="rotate(240,50,50)"/>
+          <circle cx="50" cy="50" r="6" fill="#0A0A0E"/>
+        </svg>
+        <span>Konoha Notes</span>
+      </div>
+      <button class="mobile-menu-close" onclick="toggleMobileMenu()" aria-label="Close menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="mobile-menu-links">
+      <button class="mobile-nav-btn" onclick="navToHome('features');toggleMobileMenu()">Features</button>
+      <button class="mobile-nav-btn" onclick="navToHome('history');toggleMobileMenu()">History</button>
+      <button class="mobile-nav-btn" onclick="navToHome('clans');toggleMobileMenu()">Clans</button>
+      <button class="mobile-nav-btn" onclick="navToHome('legends');toggleMobileMenu()">Legends</button>
+      <div class="mobile-menu-divider"></div>
+      <button class="mobile-nav-btn mobile-nav-btn-primary" id="mRegisterBtn" onclick="showView('auth','register');toggleMobileMenu()">Register</button>
+      <button class="mobile-nav-btn" id="mProfileBtn" onclick="showView('profile');toggleMobileMenu()" style="display:none">Profile</button>
+      <button class="mobile-nav-btn mobile-nav-btn-primary" id="mNotesBtn" onclick="openNotesFromNav();toggleMobileMenu()" style="display:none">My Scroll</button>
+      <button class="mobile-nav-btn" id="mSettingsBtn" onclick="showView('settings');toggleMobileMenu()" style="display:none">Settings</button>
+    </div>
+    <div class="mobile-menu-footer">
+      <span>火の意志 — The Will of Fire</span>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH CANVAS (only rendered when auth view active) -->
+<canvas id="authBgCanvas" style="display:none"></canvas>
+<div class="auth-cursor" id="authCursor" style="display:none"></div>
+<div class="auth-cring" id="authCring" style="display:none"></div>
+
+<!-- ==================== HOME VIEW ==================== -->
+<div class="view active" id="view-home">
+
+<section id="hero">
+  <canvas id="hero-canvas"></canvas>
+  
+  <div class="hero-content">
+    <div class="hero-seal">木ノ葉隠れの里 — Village of the Leaf</div>
+    <h1 class="hero-title">Konoha<br/>Notes</h1>
+    <div class="hero-subtitle">Where Every Thought is a Sealed Scroll</div>
+    <div class="hero-jp">秘密のノートを残せ</div>
+    <div class="hero-btns">
+      <button class="btn btn-primary" onclick="showView('auth','register')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Begin Your Journey
+      </button>
+      <button class="btn btn-secondary" onclick="scrollToSection('features')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        See Features
+      </button>
+    </div>
+    <div class="itachi-quote">
+      <div class="itachi-quote-line"></div>
+      <div class="itachi-quote-text">"People's lives don't end when they die.<br>It ends when they lose faith."</div>
+      <div class="itachi-quote-line"></div>
+      <div style="font-family:var(--font-jp);font-size:0.75rem;color:rgba(192,57,43,0.3);margin-top:8px;letter-spacing:0.2em">— Itachi Uchiha</div>
+    </div>
+  </div>
+  <div class="hero-scroll">
+    <div class="scroll-line"></div>
+    Scroll Down
+  </div>
+</section>
+
+<!-- FEATURES (NEW) -->
+<section class="section" id="features">
+  <div class="section-inner">
+    <div class="section-tag scroll-reveal">What is Konoha Notes</div>
+    <h2 class="section-title scroll-reveal">Seal Your <span>Thoughts</span></h2>
+    <p class="section-lead scroll-reveal">A cinematic note-taking app for shinobi who guard their secrets. Write, organize, and seal your scrolls — beautifully.</p>
+    <div class="divider scroll-reveal"></div>
+    <div class="features-grid">
+      <div class="feature-card scroll-reveal">
+        <span class="feature-icon">📜</span>
+        <div class="feature-title">Rich Scroll Editor</div>
+        <div class="feature-desc">Write with a full formatting toolbar — bold, headings, lists, code blocks, quotes. Your thoughts, perfectly sealed.</div>
+      </div>
+      <div class="feature-card scroll-reveal">
+        <span class="feature-icon">🏷</span>
+        <div class="feature-title">Tag &amp; Organize</div>
+        <div class="feature-desc">Add tags to every scroll. Filter by pinned or recent. Your archive stays as organized as a Jonin's mission files.</div>
+      </div>
+      <div class="feature-card scroll-reveal">
+        <span class="feature-icon">📌</span>
+        <div class="feature-title">Pin Priority Scrolls</div>
+        <div class="feature-desc">Mark your most critical notes. Pinned scrolls rise to the top — like S-rank missions in a Hokage's briefing.</div>
+      </div>
+      <div class="feature-card scroll-reveal">
+        <span class="feature-icon">⚡</span>
+        <div class="feature-title">Auto-Seal (Autosave)</div>
+        <div class="feature-desc">Every 2 seconds of inactivity, your scroll is automatically sealed. No chakra wasted on manual saves.</div>
+      </div>
+      <div class="feature-card scroll-reveal">
+        <span class="feature-icon">🔒</span>
+        <div class="feature-title">Your Scrolls, Under Your Seal</div>
+        <div class="feature-desc">Save your notes to your account and return to them whenever you sign in. Your private scrolls stay protected behind your shinobi identity.</div>
+      </div>
+      <div class="feature-card scroll-reveal">
+        <span class="feature-icon">🌀</span>
+        <div class="feature-title">Shinobi Profile</div>
+        <div class="feature-desc">Track your writing stats — total scrolls, word count, rank progression from Academy Student to Kage.</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:48px">
+      <button class="btn btn-primary" onclick="showView('auth','register')" style="margin:0 auto">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        Start Writing Free
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- HISTORY -->
+<section class="section" id="history">
+  <div class="history-bg-kanji">歴</div>
+  <div class="section-inner">
+    <div class="section-tag">The Scrolls of Time</div>
+    <h2 class="section-title">History of <span>Konoha</span></h2>
+    <p class="section-lead">From the first alliance between the Senju and Uchiha clans to the era of peace, the Village Hidden in the Leaves stands as a testament to human will and sacrifice.</p>
+    <div class="divider"></div>
+    <div class="timeline">
+      <div class="timeline-item" onclick="openStoryModal(this)" data-story="In the endless Warring States Period, children were sent to battle before they could read. Hashirama Senju and Madara Uchiha met as boys at a river, skipping stones, unaware their clans were mortal enemies. They shared a dream: a village where children would not die on battlefields. But adulthood tore them apart. Madara's brother was killed by Hashirama's kin. Hashirama's brother was killed by Madara's. Yet Hashirama refused to abandon his friend. He offered his own life for peace. Madara, moved beyond words, accepted. Together they carved Konohagakure from the forest — the first hidden village in history. The very name meant 'Village Hidden in the Leaves.' But peace was fragile. Madara grew suspicious of the Senju dominance, challenged Hashirama to a duel at the Valley of the End, and fell. Hashirama buried his friend's body in secret, weeping alone. The village they built would outlast them both, becoming the greatest shinobi nation the world had ever known. The Will of Fire — the belief that love for the village transcends blood — was born in that sacrifice.">
+        <div class="timeline-content">
+          <div class="timeline-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/static.wikia.nocookie.net/ee7d28b6ffa9f0eb6b54e2307752bdaebbf95f1e" alt="Valley of the End - Hashirama and Madara statues" loading="lazy"/><div class="img-shimmer"></div></div>
+          <div class="timeline-era">Era of Warring States</div>
+          <div class="timeline-name">The Founding Alliance</div>
+          <div class="timeline-text">Hashirama Senju and Madara Uchiha — once bitter enemies — forged the most unlikely of alliances. Their combined vision gave birth to Konohagakure no Sato, the first of the five great hidden villages. The Will of Fire was born here.</div>
+          <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+        </div><div class="timeline-dot"></div>
+      </div>
+      <div class="timeline-item" onclick="openStoryModal(this)" data-story="Minato Namikaze was the fastest shinobi who ever lived. During the Third Shinobi World War, enemy villages issued flee-on-sight orders: if you saw his blonde hair, you ran. He developed the Rasengan in three years, a technique that took the Tailed Beast Bomb's rotation and compressed it into a palm-sized sphere. But Minato's greatest battle was not against enemies — it was against time itself. When the Nine-Tails attacked Konoha, he had minutes to save his newborn son. He sealed half the beast into Naruto and half into himself, using the Reaper Death Seal to bind his own soul. He died with his wife Kushina, their hands interlocked, leaving Naruto a hero's burden and a mother's love sealed in chakra. Minato never saw his son grow up. But he left him the Will of Fire, and a name that would shake the world. His legacy lived on in the Hokage Monument, in the Flying Thunder God kunai scattered across the village, and in the boy who carried the fox he had sealed.">
+        <div class="timeline-content">
+          <div class="timeline-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/static.wikia.nocookie.net/dfa0cd365ade6bee8d170aa61438b41fbe31b3f4" alt="Minato Namikaze - The Yellow Flash" loading="lazy"/><div class="img-shimmer"></div></div>
+          <div class="timeline-era">Third Shinobi World War</div>
+          <div class="timeline-name">The Yellow Flash's Legend</div>
+          <div class="timeline-text">Minato Namikaze's Flying Thunder God technique became so feared that enemy villages ordered their ninja to flee on sight. His sealing of the Nine-Tails into his newborn son Naruto became the defining act that shaped the next generation of Konoha.</div>
+          <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+        </div><div class="timeline-dot"></div>
+      </div>
+      <div class="timeline-item" onclick="openStoryModal(this)" data-story="Itachi Uchiha was thirteen when he was ordered to slaughter his entire clan. The Uchiha, Konoha's police force for generations, had grown suspicious of the village leadership. They planned a coup that would trigger civil war, invite invasion from other nations, and destroy everything Hashirama had built. Danzo Shimura, the shadow of the village, gave Itachi an impossible choice: kill every Uchiha and save the village, or watch the village burn. Itachi chose to become the monster. He killed his parents, his friends, his lover, and everyone who shared his blood. He spared only Sasuke, his younger brother, because he could not bear to kill the one person he loved most. He let Sasuke hate him, let Sasuke chase him, let Sasuke try to kill him — all so Sasuke would grow strong enough to survive. When the truth came too late, Sasuke learned that Itachi had been a hero all along — a hero who wore the mask of a villain, who carried the weight of genocide so his village could sleep in peace. The Uchiha district stood empty for years, a graveyard of unmarked graves, until Sasuke returned to bury the past.">
+        <div class="timeline-content">
+          <div class="timeline-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/static0.gamerantimages.com/e518d60950a173a8393b6f2437b07a6b2fbdc0ef.jpg" alt="Itachi Uchiha - Night of the Massacre" loading="lazy"/><div class="img-shimmer"></div></div>
+          <div class="timeline-era">The Night of Blood</div>
+          <div class="timeline-name">Uchiha Massacre</div>
+          <div class="timeline-text">Itachi Uchiha, ordered by Danzo and the village elders, eradicated his entire clan in a single night — sparing only his younger brother Sasuke. This act, born of duty and impossible love, haunted the village for decades.</div>
+          <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+        </div><div class="timeline-dot"></div>
+      </div>
+      <div class="timeline-item" onclick="openStoryModal(this)" data-story="Naruto Uzumaki was born the hero's son and raised the village pariah. The night he was born, his father sealed the Nine-Tails inside him — and died. The village saw not a child, but a weapon. They shunned him, whispered when he passed, forbade their children from playing with him. Naruto ate alone, slept alone, and acted out for attention — painting the Hokage faces, stealing the Scroll of Seals, pulling pranks that made people look at him, even if in anger. Iruka Umino, the first person who saw him as a child, gave him the forehead protector that changed his life. Jiraiya taught him the Rasengan and called him the 'Child of Prophecy.' Naruto defeated Pain when no one else could, talked down Obito, redeemed Sasuke, and became the Seventh Hokage — the strongest shinobi in history. He married Hinata, the girl who loved him when he was nobody, and named his son Boruto. The boy who once had no one now has everything. And he never forgot what it felt like to be alone. His era is one of peace, but the Will of Fire burns as fiercely as ever.">
+        <div class="timeline-content">
+          <div class="timeline-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/static.wikia.nocookie.net/62cd764b71bceb25ffa1ec2981d164297c35f28c" alt="Naruto Uzumaki - Seventh Hokage Era" loading="lazy"/><div class="img-shimmer"></div></div>
+          <div class="timeline-era">Era of the Seventh Hokage</div>
+          <div class="timeline-name">Naruto's New Dawn</div>
+          <div class="timeline-text">Naruto Uzumaki, once the village pariah, achieved the impossible — becoming the Seventh Hokage and ushering in an era of peace. His unwavering determination to never abandon a comrade changed the very soul of the shinobi world.</div>
+          <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+        </div><div class="timeline-dot"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CLANS -->
+<section class="section" id="clans">
+  <div class="section-inner">
+    <div class="section-tag scroll-reveal">The Great Bloodlines</div>
+    <h2 class="section-title scroll-reveal">Clans of <span>Konoha</span></h2>
+    <p class="section-lead scroll-reveal">Each clan carries a unique bloodline limit — a Kekkei Genkai — passed down through generations.</p>
+    <div class="divider scroll-reveal"></div>
+    <div class="clans-grid">
+      <div class="clan-card scroll-reveal" onclick="openStoryModal(this)" data-story="The Uchiha were once called the 'Clan of the Fan' — their symbol itself a war fan. For generations, they were the police force of Konoha, yet suspicion festered in the shadows. Itachi Uchiha, ordered by the village elders, slaughtered his entire clan in a single night to prevent civil war. Only Sasuke survived, carrying the weight of vengeance. The Uchiha curse is simple: their love burns so fiercely that when it turns to loss, it becomes hatred powerful enough to awaken the Mangekyō Sharingan. Madara Uchiha, the clan's greatest rebel, challenged the very foundation of peace that Hashirama built. Even in extinction, the Uchiha legacy haunts Konoha — through Sasuke's redemption, Obito's sacrifice, and the eternal flame of the Sharingan.">
+        <svg class="clan-symbol" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="28" stroke="#C0392B" stroke-width="1.5"/><circle cx="30" cy="30" r="8" fill="#C0392B"/><path d="M30 2 Q37 12 30 18 Q23 12 30 2Z" fill="#C0392B"/><path d="M30 2 Q37 12 30 18 Q23 12 30 2Z" fill="#C0392B" transform="rotate(120,30,30)"/><path d="M30 2 Q37 12 30 18 Q23 12 30 2Z" fill="#C0392B" transform="rotate(240,30,30)"/><circle cx="30" cy="30" r="3" fill="#0A0A0E"/></svg>
+        <div class="clan-rank">S-Rank Clan</div>
+        <div class="clan-name">Uchiha Clan</div>
+        <div class="clan-name-jp">うちは一族</div>
+        <div class="clan-desc">The most gifted users of Fire Release and the Sharingan dojutsu. Their intense love transforms into hatred upon loss, awakening the Mangekyō Sharingan.</div>
+        <div class="clan-ability">🔥 Sharingan — Amaterasu — Susanoo</div>
+        <div class="clan-bg-kanji">炎</div>
+        <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+      </div>
+      <div class="clan-card scroll-reveal" onclick="openStoryModal(this)" data-story="The Senju were called the 'Clan of a Thousand Skills' — born from the Sage of Six Paths' younger son, Asura. Where the Uchiha sought power through hatred, the Senju believed in cooperation and love. Hashirama Senju, the 'God of Shinobi,' possessed Wood Release so powerful he could subdue Tailed Beasts bare-handed. He forged an impossible alliance with Madara Uchiha, ending centuries of bloodshed to create Konoha — the first hidden village. His cells became so coveted that Orochimaru and Danzo grafted them into their own bodies. The Senju legacy lives in Tsunade's medical miracles, the Will of Fire, and the very foundation of the shinobi world.">
+        <svg class="clan-symbol" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="28" stroke="#2ecc71" stroke-width="1.5" opacity="0.6"/><path d="M30 8 L30 52 M8 30 L52 30 M14 14 L46 46 M46 14 L14 46" stroke="#2ecc71" stroke-width="1" opacity="0.4"/><circle cx="30" cy="30" r="6" fill="#2ecc71" opacity="0.6"/></svg>
+        <div class="clan-rank">Founder Clan</div>
+        <div class="clan-name">Senju Clan</div>
+        <div class="clan-name-jp">千手一族</div>
+        <div class="clan-desc">Descended from Asura Ōtsutsuki, masters of all ninjutsu forms. Their Wood Release allowed them to control Tailed Beasts. Co-founders of Konoha.</div>
+        <div class="clan-ability">🌿 Wood Release — Yin-Yang Release</div>
+        <div class="clan-bg-kanji">木</div>
+        <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+      </div>
+      <div class="clan-card scroll-reveal" onclick="openStoryModal(this)" data-story="The Uzumaki were the 'Clan of the Whirlpool' — distant relatives of the Senju, bound by blood and alliance. Their village, Uzushiogakure, was destroyed by other nations who feared their sealing arts. The Uzumaki possessed life force so potent that Karin could heal wounds with a bite, and Kushina survived extraction of the Nine-Tails. Their symbol — the spiral — was engraved on Konoha's flak jackets as a sign of eternal alliance. Naruto Uzumaki, the last true bearer of the name, was shunned as a child yet became the greatest Hokage in history. The clan's greatest seal was not a jutsu, but a mother's love: Kushina's chakra sealed within Naruto, protecting him even from death.">
+        <svg class="clan-symbol" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="28" stroke="#FF6B35" stroke-width="1.5" opacity="0.8"/><path d="M30 30 Q40 20 35 30 Q40 40 30 35 Q20 40 25 30 Q20 20 30 25Z" stroke="#FF6B35" stroke-width="1.5" fill="none" opacity="0.8"/><circle cx="30" cy="30" r="4" fill="#FF6B35" opacity="0.8"/></svg>
+        <div class="clan-rank">Allied Clan</div>
+        <div class="clan-name">Uzumaki Clan</div>
+        <div class="clan-name-jp">うずまき一族</div>
+        <div class="clan-desc">Extraordinary life force, longevity, and sealing jutsu mastery. Their sealing arts were the most feared in the world. Naruto carries their legacy.</div>
+        <div class="clan-ability">🌀 Fūinjutsu — Adamantine Chains</div>
+        <div class="clan-bg-kanji">渦</div>
+        <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+      </div>
+      <div class="clan-card scroll-reveal" onclick="openStoryModal(this)" data-story="The Hyūga are Konoha's oldest and most noble clan — 'Those Who Walk in the Sunlight.' Their Byakugan sees through walls, observes chakra pathways, and perceives nearly 360 degrees. For centuries, the clan maintained a cruel hierarchy: the main house and the branch house, the latter branded with the Cursed Seal to ensure obedience. Neji Hyūga, a branch house prodigy, believed his fate was sealed until Naruto proved destiny could be changed. Hinata Hyūga, the main house heiress, found strength not in her eyes but in her heart — loving Naruto from the shadows since childhood. The Gentle Fist does not cut flesh; it strikes chakra points directly, stopping the flow of life itself. Their white eyes have witnessed Konoha's history longer than any other clan.">
+        <svg class="clan-symbol" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="28" stroke="#B8D4FF" stroke-width="1.5" opacity="0.6"/><circle cx="30" cy="30" r="15" stroke="#B8D4FF" stroke-width="1" opacity="0.4"/><circle cx="30" cy="30" r="5" fill="#B8D4FF" opacity="0.6"/></svg>
+        <div class="clan-rank">Noble Clan</div>
+        <div class="clan-name">Hyūga Clan</div>
+        <div class="clan-name-jp">日向一族</div>
+        <div class="clan-desc">Wielders of the Byakugan — the All-Seeing White Eye. Their Gentle Fist style strikes chakra points directly, disrupting the enemy's flow.</div>
+        <div class="clan-ability">👁️ Byakugan — Gentle Fist — 64 Palms</div>
+        <div class="clan-bg-kanji">眼</div>
+        <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+      </div>
+      <div class="clan-card scroll-reveal" onclick="openStoryModal(this)" data-story="The Nara Clan are the shadow strategists of Konoha — brilliant minds wrapped in apparent laziness. Their Shadow Possession Jutsu can freeze an enemy in place, forcing them to mimic every movement. Shikamaru Nara, with an IQ over 200, defeated an immortal Akatsuki member through pure strategy, then gave up his dream of a simple life to become the Hokage's advisor. The clan maintains a sacred forest where they raise deer, using their antlers for medicine. For generations, the Nara, Yamanaka, and Akimichi clans have formed the 'Ino-Shika-Chō' trio — a bond sealed by earrings passed from fathers to sons. In the shadows, they see what others miss. In silence, they plan what others cannot imagine.">
+        <svg class="clan-symbol" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="28" stroke="#8B7355" stroke-width="1.5" opacity="0.6"/><path d="M15 20 L45 40 M15 40 L45 20 M30 8 L30 52" stroke="#8B7355" stroke-width="1" opacity="0.5"/><circle cx="30" cy="30" r="5" fill="#8B7355" opacity="0.5"/></svg>
+        <div class="clan-rank">Elite Clan</div>
+        <div class="clan-name">Nara Clan</div>
+        <div class="clan-name-jp">奈良一族</div>
+        <div class="clan-desc">Masters of Shadow Manipulation. Shikamaru Nara's IQ exceeds 200. They manage the Nara Clan Forest and maintain a bond with its deer.</div>
+        <div class="clan-ability">🦌 Shadow Imitation — Shadow Paralysis</div>
+        <div class="clan-bg-kanji">影</div>
+        <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+      </div>
+      <div class="clan-card scroll-reveal" onclick="openStoryModal(this)" data-story="The Yamanaka Clan are the unseen warriors of the mind — florists by trade, telepaths by blood. Their Mind Transfer Jutsu allows a shinobi to project their consciousness into another body, controlling enemies or communicating across distances. Ino Yamanaka transformed from a shallow girl obsessed with Sasuke into a formidable warrior who linked the entire Allied Shinobi Forces' minds during the Fourth War. The clan runs a flower shop in Konoha, and their jutsu names are derived from flowers: 'Mind Transfer' and 'Sensory Jutsu.' For generations, the Yamanaka have formed the 'Ino' in the Ino-Shika-Chō formation — the sensor and controller who guides the shadow and the expansion. They prove that the most dangerous weapons are not blades, but thoughts.">
+        <svg class="clan-symbol" viewBox="0 0 60 60" fill="none"><circle cx="30" cy="30" r="28" stroke="#DDA0DD" stroke-width="1.5" opacity="0.6"/><circle cx="30" cy="30" r="12" stroke="#DDA0DD" stroke-width="1" opacity="0.4"/><path d="M30 18 Q35 24 30 30 Q25 24 30 18" fill="#DDA0DD" opacity="0.4"/><path d="M30 18 Q35 24 30 30 Q25 24 30 18" fill="#DDA0DD" opacity="0.4" transform="rotate(120,30,30)"/><path d="M30 18 Q35 24 30 30 Q25 24 30 18" fill="#DDA0DD" opacity="0.4" transform="rotate(240,30,30)"/></svg>
+        <div class="clan-rank">Mind Clan</div>
+        <div class="clan-name">Yamanaka Clan</div>
+        <div class="clan-name-jp">山中一族</div>
+        <div class="clan-desc">Specialists in mind-related techniques. Mind Transfer allows consciousness projection. Partners with Nara and Akimichi in the legendary Ino-Shika-Chō trio.</div>
+        <div class="clan-ability">🧠 Mind Transfer — Mind Body Disturbance</div>
+        <div class="clan-bg-kanji">心</div>
+        <div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LEGENDS -->
+<section class="section" id="legends">
+  <div class="section-inner">
+    <div class="legends-title-wrap">
+      <div class="section-tag" style="justify-content:center">The Immortal Names</div>
+      <h2 class="section-title">Legendary <span>Shinobi</span></h2>
+      <p class="section-lead" style="margin:0 auto;text-align:center">Those whose names are carved into the stone of history.</p>
+    </div>
+    <div class="legends-grid">
+      <div class="legend-card" onclick="openStoryModal(this)" data-story="Hashirama Senju was born in the Warring States Period, when children became soldiers before they could write. He and Madara Uchiha met as boys at a river, skipping stones, unaware their clans were mortal enemies. They shared a dream: a village where children wouldn't die on battlefields. Hashirama's Wood Release was so powerful he could subdue the Nine-Tails with a single hand, yet he wept when he had to fight his friend. He became the First Hokage, carving the faces of leaders into the mountain to inspire generations. His cells became the most coveted substance in the world — granting regeneration, enhancing jutsu, and even creating artificial humans. Hashirama died believing peace was possible. His Will of Fire burns still in every leaf that falls on Konoha."><div class="legend-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/static0.gamerantimages.com/8f862225ad1b316c4ee728e5deda849a497270af.jpg" alt="Hashirama Senju - God of Shinobi" loading="lazy"/><div class="legend-img-overlay"></div><div class="legend-img-border"></div><div class="img-shimmer"></div></div><div class="legend-info"><div class="legend-rank-badge">1st Hokage</div><div class="legend-name">Hashirama Senju</div><div class="legend-title">God of Shinobi</div><div class="legend-desc">His Wood Release suppressed Tailed Beasts bare-handed. His dream of peace birthed Konoha.</div><div class="legend-kekkei"><span>Wood Release</span><span>Sage Mode</span></div></div><div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div></div>
+      <div class="legend-card" onclick="openStoryModal(this)" data-story="Minato Namikaze was the fastest shinobi who ever lived — the Yellow Flash who could teleport across battlefields in an instant. During the Third Shinobi World War, enemy villages issued flee-on-sight orders: if you saw his blonde hair, you ran. He developed the Rasengan in three years, a technique that took the Tailed Beast Bomb's rotation and compressed it into a palm-sized sphere. But Minato's greatest battle was not against enemies — it was against time itself. When the Nine-Tails attacked Konoha, he had minutes to save his newborn son. He sealed half the beast into Naruto and half into himself, using the Reaper Death Seal to bind his own soul. He died with his wife Kushina, their hands interlocked, leaving Naruto a hero's burden and a mother's love sealed in chakra. Minato never saw his son grow up. But he left him the Will of Fire, and a name that would shake the world."><div class="legend-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/static.wikia.nocookie.net/dfa0cd365ade6bee8d170aa61438b41fbe31b3f4" alt="Minato Namikaze - Konoha's Yellow Flash" loading="lazy"/><div class="legend-img-overlay"></div><div class="legend-img-border"></div><div class="img-shimmer"></div></div><div class="legend-info"><div class="legend-rank-badge">4th Hokage</div><div class="legend-name">Minato Namikaze</div><div class="legend-title">Konoha's Yellow Flash</div><div class="legend-desc">So feared that enemy villages issued flee-on-sight orders. Teleportation mastery unmatched in history.</div><div class="legend-kekkei"><span>Flying Thunder God</span><span>Rasengan</span></div></div><div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div></div>
+      <div class="legend-card" onclick="openStoryModal(this)" data-story="Itachi Uchiha was four when he witnessed the horrors of the Third Shinobi World War. He was six when he enrolled in the Academy. He was thirteen when he was ordered to slaughter his entire clan — to prevent a civil war that would destroy Konoha and drag other nations into conflict. He killed his parents, his friends, his lover, and everyone who shared his blood. He spared only Sasuke, his younger brother, because he could not bear to kill the one person he loved most. Itachi joined the Akatsuki as a spy, living as a traitor, hated by the brother he protected. He let Sasuke hate him, let Sasuke chase him, let Sasuke try to kill him — all so Sasuke would grow strong enough to survive. When they finally fought, Itachi was nearly blind and dying of a terminal illness. He died smiling, tapping Sasuke's forehead one last time, just as he had when they were children. The truth came too late. Itachi had been a hero all along — a hero who wore the mask of a villain, who carried the weight of genocide so his village could sleep in peace."><div class="legend-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/w0.peakpx.com/850f4178699d642b801d2887e61293e07a435d25.jpg" alt="Itachi Uchiha - The Crow Among Ravens" loading="lazy"/><div class="legend-img-overlay"></div><div class="legend-img-border"></div><div class="img-shimmer"></div></div><div class="legend-info"><div class="legend-rank-badge">Uchiha Prodigy</div><div class="legend-name">Itachi Uchiha</div><div class="legend-title">The Crow Among Ravens</div><div class="legend-desc">Sacrificed everything — his clan, his name, his life — to protect his brother and the village.</div><div class="legend-kekkei"><span>Mangekyō</span><span>Amaterasu</span><span>Tsukuyomi</span></div></div><div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div></div>
+      <div class="legend-card" onclick="openStoryModal(this)" data-story="Naruto Uzumaki was born the hero's son and raised the village pariah. The night he was born, his father sealed the Nine-Tails inside him — and died. The village saw not a child, but a weapon. They shunned him, whispered when he passed, forbade their children from playing with him. Naruto ate alone, slept alone, and acted out for attention — painting the Hokage faces, stealing the Scroll of Seals, pulling pranks that made people look at him, even if in anger. Iruka Umino, the first person who saw him as a child, gave him the forehead protector that changed his life. Jiraiya taught him the Rasengan and called him the 'Child of Prophecy.' Naruto defeated Pain when no one else could, talked down Obito, redeemed Sasuke, and became the Seventh Hokage — the strongest shinobi in history. He married Hinata, the girl who loved him when he was nobody, and named his son Boruto. The boy who once had no one now has everything. And he never forgot what it felt like to be alone."><div class="legend-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/rukminim2.flixcart.com/8e28d1025e2bead17274f2944d92739f1c8bece4.jpeg" alt="Naruto Uzumaki - Hero of the Hidden Leaf" loading="lazy"/><div class="legend-img-overlay"></div><div class="legend-img-border"></div><div class="img-shimmer"></div></div><div class="legend-info"><div class="legend-rank-badge">7th Hokage</div><div class="legend-name">Naruto Uzumaki</div><div class="legend-title">Hero of the Hidden Leaf</div><div class="legend-desc">Once shunned as a demon vessel, became the greatest Hokage in history through sheer will.</div><div class="legend-kekkei"><span>Nine-Tails</span><span>Sage of Six Paths</span></div></div><div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div></div>
+      <div class="legend-card" onclick="openStoryModal(this)" data-story="Tsunade Senju was born into greatness — granddaughter of the First Hokage, niece of the Second, student of the Third. She was a medical prodigy who could heal wounds that killed others, and her strength could shatter stone with a flick. But greatness could not protect her from loss. Her younger brother Nawaki died on a mission, clutching the Hokage necklace she gave him. Her lover Dan died in her arms, whispering his dream of becoming Hokage. Tsunade developed a paralyzing fear of blood and abandoned the village, wandering the gambling halls of the world, losing every bet. Jiraiya and Naruto found her in a bar. Naruto, a boy who knew nothing of her pain, wore her necklace and declared he would become Hokage. She laughed, then cried, then returned. As Fifth Hokage, she led Konoha through the Pain invasion, healed the entire village, and punched Madara Uchiha through a Susanoo. She never won a bet in her life. But she never lost the people she loved again."><div class="legend-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/static.wikia.nocookie.net/f8dd89b3bdad800d0b8af8e66dd3814ee5b3f380" alt="Tsunade Senju - Princess of the Senju" loading="lazy"/><div class="legend-img-overlay"></div><div class="legend-img-border"></div><div class="img-shimmer"></div></div><div class="legend-info"><div class="legend-rank-badge">5th Hokage</div><div class="legend-name">Tsunade Senju</div><div class="legend-title">Princess of the Senju</div><div class="legend-desc">Granddaughter of the First Hokage. Medical ninjutsu and monstrous strength made her a legendary Sannin.</div><div class="legend-kekkei"><span>Medical Ninjutsu</span><span>Creation Rebirth</span></div></div><div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div></div>
+      <div class="legend-card" onclick="openStoryModal(this)" data-story="Jiraiya was a fool, a pervert, and a genius — one of the Legendary Sannin who could have been Hokage three times and refused every offer. He trained under the Third Hokage alongside Orochimaru and Tsunade, watching his best friend descend into darkness. He traveled the world writing the Icha Icha novels, peeping on women, and gathering intelligence. But beneath the mask was a man who never stopped searching. He trained Minato Namikaze, who became the Fourth Hokage. He trained Nagato, Konan, and Yahiko in the Rain Village, believing they were the Children of Prophecy — only to watch Nagato become Pain, the very enemy he had to stop. He trained Naruto for three years, teaching him the Rasengan, summoning jutsu, and the way of the sage. When he infiltrated the Rain Village alone, he discovered Pain's secret but had no way to escape. He died in battle, his body sinking into the ocean, his last words scratched into a toad's back: 'The real one isn't there.' He never saw Naruto become Hokage. But he believed in him until his last breath."><div class="legend-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/www.japanpowered.com/784f6b4a2e2a4a75508f64f172fb80d00386e005.jpg" alt="Jiraiya - The Toad Sage of Mt. Myoboku" loading="lazy"/><div class="legend-img-overlay"></div><div class="legend-img-border"></div><div class="img-shimmer"></div></div><div class="legend-info"><div class="legend-rank-badge">Legendary Sannin</div><div class="legend-name">Jiraiya</div><div class="legend-title">The Toad Sage of Mt. Myōboku</div><div class="legend-desc">Trained both Minato and Naruto, gathering intelligence on Akatsuki to his dying breath.</div><div class="legend-kekkei"><span>Sage Mode</span><span>Toad Summoning</span></div></div><div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div></div>
+      <div class="legend-card" onclick="openStoryModal(this)" data-story="Sasuke Uchiha was eight when he found his entire clan slaughtered — every body, every face, every person he loved, dead in the streets. His brother Itachi stood over their parents' corpses and told him to grow strong, to hate, to seek revenge. Sasuke spent his childhood in the shadow of that massacre, his only goal to kill his brother. He abandoned Konoha, joined Orochimaru, and sacrificed everything for power. When he finally killed Itachi, he learned the truth: Itachi had been ordered by the village elders to prevent civil war. Sasuke's world collapsed. He declared war on the entire shinobi system, seeking to become the darkness that the Hokage's light could not reach — the 'Shadow Hokage.' He and Naruto fought at the Valley of the End, each losing an arm. Sasuke admitted defeat not because he was weaker, but because Naruto's bond was stronger than his hatred. He became a wanderer, protecting Konoha from the shadows, carrying the weight of the Uchiha name alone. The last Uchiha. The Other Hokage."><div class="legend-img-wrap"><img src="https://kimi-web-img.moonshot.cn/img/www.nicepng.com/4e6bc9c7b14a8b532ddd8ed278dae62578a30b41.png" alt="Sasuke Uchiha - The Other Hokage" loading="lazy"/><div class="legend-img-overlay"></div><div class="legend-img-border"></div><div class="img-shimmer"></div></div><div class="legend-info"><div class="legend-rank-badge">Last Uchiha</div><div class="legend-name">Sasuke Uchiha</div><div class="legend-title">The Other Hokage</div><div class="legend-desc">Naruto's eternal rival. From revenge-driven avenger to the village's shadow protector.</div><div class="legend-kekkei"><span>Eternal Mangekyō</span><span>Rinnegan</span></div></div><div class="card-view-overlay"><span class="card-view-btn"><span class="shimmer"></span><span class="tomoe"></span>Unseal</span></div></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">木ノ葉隠れの里</div>
+  <div class="footer-text">Konoha Notes — Seal your thoughts. Guard your secrets. Carry the Will of Fire.</div>
+  <div style="margin-top:16px;font-size:0.8rem;color:var(--text3)">火の意志は永遠に燃え続ける — The Will of Fire Burns Forever</div>
+</footer>
+</div><!-- end view-home -->
+
+<!-- ==================== AUTH VIEW ==================== -->
+<div class="view" id="view-auth">
+  <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:40px 20px;">
+    <div class="auth-glass-card" id="authCard">
+      <div class="auth-ep" id="authEp">
+        <canvas id="authEyeCanvas"></canvas>
+        <div class="auth-ep-title" id="authEpTitle">
+          <h3 id="authEpH">Eternal Mangekyō</h3>
+          <p id="authEpP">Awaken your dōjutsu<br>to enter the Archives</p>
+        </div>
+        <div class="auth-ep-quote">
+          <blockquote id="authEpQuote">"Those who cannot acknowledge themselves will eventually fail."</blockquote>
+          <cite>— Itachi Uchiha</cite>
+          <span class="auth-ep-rune">木ノ葉の里 · 無限月読 · 忍</span>
+        </div>
+      </div>
+      <div class="auth-fp" id="authFp">
+        <div class="auth-brand" id="authBrand">
+          <div class="auth-bseal"><svg width="20" height="20" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="10" stroke="#cc1111" stroke-width="0.8"/><circle cx="11" cy="11" r="5.5" stroke="#880000" stroke-width="0.6"/><circle cx="11" cy="11" r="2" fill="#cc1111"/><circle cx="11" cy="5.8" r="1.4" fill="#880000"/><path d="M11 5.8 Q14.8 7.4 14.2 10.8" stroke="#880000" stroke-width="0.6" fill="none"/><circle cx="15.5" cy="13.8" r="1.4" fill="#880000"/><path d="M15.5 13.8 Q12.5 17.8 9.2 16.2" stroke="#880000" stroke-width="0.6" fill="none"/><circle cx="6.5" cy="13.8" r="1.4" fill="#880000"/><path d="M6.5 13.8 Q8.8 17.8 12 16.5" stroke="#880000" stroke-width="0.6" fill="none"/></svg></div>
+          <div><div class="auth-bname">Konoha Notes</div><div class="auth-bsub">Infinity Tsukuyomi Archives</div></div>
+          <div class="auth-bline"></div>
+        </div>
+        <div class="auth-mtog" id="authMtog">
+          <button class="auth-mb active" id="btnLogin" onclick="switchAuthMode('login')">Sign In</button>
+          <button class="auth-mb" id="btnReg" onclick="switchAuthMode('register')">Enlist</button>
+        </div>
+        <div id="verificationPanel" style="display:none;flex-direction:column;">
+          <div class="auth-tbadge">Shinobi Record Created</div>
+          <h1 class="auth-ftit">Registration successful<span>Check your email</span></h1>
+          <p class="auth-fdesc">We sent a verification link to <strong id="verificationEmail"></strong>.</p>
+          <div class="auth-fields">
+            <p class="auth-fhnt">Please verify your email before signing in.</p>
+            <p class="auth-fhnt">Didn't receive the email? Check your Spam / Junk / Promotions folder.</p>
+            <p class="auth-fhnt" id="verificationFeedback" role="status" aria-live="polite" style="min-height:1.5em"></p>
+            <button class="auth-altbtn" id="verificationResendButton" type="button">Resend verification email</button>
+            <p class="auth-fhnt" id="verificationCooldownStatus" aria-live="polite"></p>
+            <button class="auth-subbtn" id="verificationCheckButton" type="button">I've verified my email</button>
+            <div class="auth-ffoot"><button id="verificationBackToLogin" type="button">Return to sign in</button></div>
+          </div>
+        </div>
+        <!-- LOGIN -->
+        <div id="authLoginForm" style="display:flex;flex-direction:column;">
+          <div class="auth-tbadge" id="ltbadge">Infinity Tsukuyomi Active</div>
+          <h1 class="auth-ftit" id="ltit">Awaken<span>Your Sharingan</span></h1>
+          <p class="auth-fdesc" id="ldesc">Enter your credentials. The infinite dream awaits those who prove worthy.</p>
+          <div class="auth-fields">
+            <div class="auth-fld" id="lf1"><div class="auth-flbl"><span class="auth-fdot"></span>Email Address</div><div class="auth-fw"><input class="auth-finp" type="email" id="loginUser" aria-label="Email address" placeholder="Enter your email..." autocomplete="email"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8.5" cy="6" r="3"/><path d="M2.5 15.5c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></div></div></div>
+            <div class="auth-fld" id="lf2"><div class="auth-flbl"><span class="auth-fdot"></span>Secret Seal</div><div class="auth-fw"><input class="auth-finp" type="password" id="loginPass" aria-label="Password" placeholder="Enter your password..." autocomplete="current-password"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="7.5" width="11" height="8" rx="1.5"/><path d="M5.5 7.5V5.5a3 3 0 016 0v2"/></svg></div><button class="auth-pwt" onclick="toggleAuthPass('loginPass',this)" type="button" aria-label="Show or hide password"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1 8S3.6 3 8 3s7 5 7 5-2.6 5-7 5S1 8 1 8z"/><circle cx="8" cy="8" r="2.2"/></svg></button></div></div>
+            <div class="auth-fgt" id="fgtw"><button type="button" id="forgotPasswordButton">Forgot your seal?</button></div>
+            <div class="auth-error" id="loginError"></div>
+            <p class="auth-fhnt" id="unverifiedLoginHelp" style="display:none">Didn't receive the verification email? Resend it below and check your Inbox or Spam folder.</p>
+            <button class="auth-subbtn" id="lbtn" onclick="doLogin()"><div class="auth-sbi"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 7h10M8 3l4 4-4 4"/></svg>Enter the Dream</div></button>
+            <div class="auth-odiv" id="lodiv"><div class="auth-oline"></div><span class="auth-otxt">Or continue as</span><div class="auth-oline"></div></div>
+            <div class="auth-ffoot" id="lfoot">Not yet enlisted? <a onclick="switchAuthMode('register')">Create your shinobi record →</a></div>
+          </div>
+        </div>
+        <!-- REGISTER -->
+        <div id="authRegForm" style="display:none;flex-direction:column;">
+          <div class="auth-tbadge" id="rtbadge">Engrave Your Soul into the Moon</div>
+          <h1 class="auth-ftit" id="rtit">Join the<span>Infinite Dream</span></h1>
+          <p class="auth-fdesc" id="rdesc">Your identity will be sealed beneath the full moon. Once engraved, no genjutsu can erase your record.</p>
+          <div class="auth-fields">
+            <div class="auth-frow" id="rrow">
+              <div class="auth-fld" id="rf1"><div class="auth-flbl"><span class="auth-fdot"></span>Full Name <span style="color:var(--red3)">*</span></div><div class="auth-fw"><input class="auth-finp" type="text" id="regName" aria-label="Full name" placeholder="Your full name..." autocomplete="name"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8.5" cy="6" r="3"/><path d="M2.5 15.5c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></div></div></div>
+              <div class="auth-fld" id="rf1b"><div class="auth-flbl"><span class="auth-fdot"></span>Role (Optional)</div><div class="auth-fw"><input class="auth-finp" type="text" id="regClan" aria-label="Role or clan (optional)" placeholder="e.g. Writer, Developer..." autocomplete="off"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8.5 2L2 6l6.5 4L15 6l-6.5-4z"/><path d="M2 11l6.5 4 6.5-4"/></svg></div></div></div>
+            </div>
+            <div class="auth-fld" id="rf2"><div class="auth-flbl"><span class="auth-fdot"></span>Username <span style="color:var(--red3)">*</span></div><div class="auth-fw"><input class="auth-finp" type="text" id="regUser" aria-label="Username" placeholder="Choose a username..." autocomplete="username"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8.5" cy="6" r="3"/><path d="M2.5 15.5c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></div></div><div class="auth-fhnt">Your identity across all archives.</div></div>
+            <div class="auth-fld" id="rf3"><div class="auth-flbl"><span class="auth-fdot"></span>Email <span style="color:var(--red3)">*</span></div><div class="auth-fw"><input class="auth-finp" type="email" id="regEmail" aria-label="Email address" placeholder="your@email.com" autocomplete="email"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 3.5h11a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1v-8a1 1 0 011-1z"/><path d="M2.5 5l6 4.5 6-4.5"/></svg></div></div></div>
+            <div class="auth-fld" id="rf4"><div class="auth-flbl"><span class="auth-fdot"></span>Password <span style="color:var(--red3)">*</span></div><div class="auth-fw"><input class="auth-finp" type="password" id="regPass" aria-label="Password, minimum 10 characters" placeholder="Minimum 10 characters" autocomplete="new-password" oninput="checkAuthPassStrength(this.value)"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="7.5" width="11" height="8" rx="1.5"/><path d="M5.5 7.5V5.5a3 3 0 016 0v2"/></svg></div><button class="auth-pwt" onclick="toggleAuthPass('regPass',this)" type="button" aria-label="Show or hide password"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M1 8S3.6 3 8 3s7 5 7 5-2.6 5-7 5S1 8 1 8z"/><circle cx="8" cy="8" r="2.2"/></svg></button></div><div class="auth-sw"><div class="auth-ss" id="as1"></div><div class="auth-ss" id="as2"></div><div class="auth-ss" id="as3"></div><div class="auth-ss" id="as4"></div></div><div class="auth-fhnt" id="authSthnt">A strong seal guards the village secrets.</div></div>
+            <div class="auth-fld" id="rf5"><div class="auth-flbl"><span class="auth-fdot"></span>Confirm Password <span style="color:var(--red3)">*</span></div><div class="auth-fw"><input class="auth-finp" type="password" id="regPass2" aria-label="Confirm password" placeholder="Repeat your password..." autocomplete="new-password" oninput="checkRegPassMatch()"/><div class="auth-fic"><svg width="15" height="15" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="7.5" width="11" height="8" rx="1.5"/><path d="M5.5 7.5V5.5a3 3 0 016 0v2"/></svg></div></div><div class="pass-match" id="authPassMatch" style="font-size:11.5px;margin-top:4px;min-height:16px"></div></div>
+            <div class="auth-error" id="regError"></div>
+            <button class="auth-subbtn" id="rbtn" onclick="doRegister()"><div class="auth-sbi"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 6.5l3.5 3.5 5.5-6"/></svg>Seal My Soul to the Moon</div></button>
+            <div class="auth-ffoot" id="rfoot">Already registered? <a onclick="switchAuthMode('login')">Sign in to your account →</a></div>
+          </div>
+        </div>
+      </div>
+      <div class="auth-qbar">"When the full moon casts its light — every living soul shall be bound to the infinite dream." — Madara Uchiha</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== PROFILE VIEW ==================== -->
+<div class="view" id="view-profile">
+  <div id="view-profile-inner">
+
+    <!-- Dossier Banner -->
+    <div class="dossier-banner">
+      <div class="dossier-banner-pattern"></div>
+      <div class="dossier-banner-content">
+        <div class="dossier-avatar-wrap">
+          <div class="dossier-avatar-seal"></div>
+          <div class="dossier-avatar-ring"></div>
+          <img class="dossier-avatar" id="profileAvatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Ccircle cx='100' cy='100' r='95' fill='%23161616'/%3E%3C/svg%3E" alt="Profile avatar"/>
+        </div>
+        <div class="dossier-title-block">
+          <div class="dossier-classification">Top Secret // Konoha Archives</div>
+          <h1 class="dossier-name" id="profileName">Shinobi</h1>
+          <div class="dossier-clan" id="profileClan">— Unknown —</div>
+          <div class="dossier-rank-badge" id="profileRank">⚡ Chunin Rank</div>
+          <div class="dossier-meta">
+            <span id="profileUsernameText">@shinobi</span>
+            <span class="dossier-divider">◆</span>
+            <span id="profileEmailText">shinobi@konoha.notes</span>
+            <span class="dossier-divider">◆</span>
+            <span id="profileVerificationText">Email verified</span>
+            <span class="dossier-divider">◆</span>
+            <span id="profileJoinedText">Joined: Unknown</span>
+            <span class="dossier-divider">◆</span>
+            <span class="dossier-id">Dossier: <span id="dossierId">KN-0000</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shinobi Path -->
+    <div class="shinobi-path" id="shinobiPath">
+      <div class="path-line"></div>
+      <div class="path-node" data-rank="academy"><div class="node-circle">Ac</div><div class="node-label">Academy</div></div>
+      <div class="path-node" data-rank="genin"><div class="node-circle">G</div><div class="node-label">Genin</div></div>
+      <div class="path-node" data-rank="chunin"><div class="node-circle">C</div><div class="node-label">Chunin</div></div>
+      <div class="path-node" data-rank="jonin"><div class="node-circle">J</div><div class="node-label">Jonin</div></div>
+      <div class="path-node" data-rank="anbu"><div class="node-circle">A</div><div class="node-label">Anbu</div></div>
+      <div class="path-node" data-rank="kage"><div class="node-circle">K</div><div class="node-label">Kage</div></div>
+    </div>
+
+    <!-- Chakra Stats -->
+    <div class="chakra-stats-grid">
+      <div class="chakra-card" onclick="showView('notes')">
+        <div class="chakra-icon">📜</div>
+        <div class="chakra-value" id="statNotes">0</div>
+        <div class="chakra-label">Secret Scrolls</div>
+        <div class="chakra-meter"><div class="chakra-meter-fill" id="meterNotes" style="width:0%"></div></div>
+        <div class="chakra-change" id="statNotesChange">+0 this week</div>
+      </div>
+      <div class="chakra-card">
+        <div class="chakra-icon">📌</div>
+        <div class="chakra-value" id="statPinned">0</div>
+        <div class="chakra-label">Priority Seals</div>
+        <div class="chakra-meter"><div class="chakra-meter-fill" id="meterPinned" style="width:0%"></div></div>
+        <div class="chakra-change" id="statPinnedChange">Priority sealed</div>
+      </div>
+      <div class="chakra-card">
+        <div class="chakra-icon">🔥</div>
+        <div class="chakra-value" id="statWords">0</div>
+        <div class="chakra-label">Chakra Invested</div>
+        <div class="chakra-meter"><div class="chakra-meter-fill" id="meterWords" style="width:0%"></div></div>
+        <div class="chakra-change" id="statWordsChange">Words written</div>
+      </div>
+      <div class="chakra-card">
+        <div class="chakra-icon">🏷</div>
+        <div class="chakra-value" id="statTags">0</div>
+        <div class="chakra-label">Jutsu Types</div>
+        <div class="chakra-meter"><div class="chakra-meter-fill" id="meterTags" style="width:0%"></div></div>
+        <div class="chakra-change" id="statTagsChange">Specialties</div>
+      </div>
+      <div class="chakra-card">
+        <div class="chakra-icon">⚡</div>
+        <div class="chakra-value" id="statLastActive">—</div>
+        <div class="chakra-label">Last Mission</div>
+        <div class="chakra-meter"><div class="chakra-meter-fill" id="meterActive" style="width:0%"></div></div>
+        <div class="chakra-change" id="statLastActiveChange">Chakra flow</div>
+      </div>
+      <div class="chakra-card">
+        <div class="chakra-icon">🎯</div>
+        <div class="chakra-value" id="statRank">Chunin</div>
+        <div class="chakra-label">Current Rank</div>
+        <div class="chakra-meter"><div class="chakra-meter-fill" id="meterRank" style="width:0%"></div></div>
+        <div class="chakra-change" id="statRankChange">Based on scrolls</div>
+      </div>
+    </div>
+
+    <!-- Dossier Columns -->
+    <div class="dossier-columns">
+      <div class="mission-panel">
+        <div class="dossier-section-title">📜 Recent Missions</div>
+        <div class="mission-scroll">
+          <div class="mission-list" id="profileActivityList">
+            <div class="mission-item">
+              <div class="mission-rank d">D</div>
+              <div class="mission-body">
+                <div class="mission-title">No recent missions</div>
+                <div class="mission-time">Begin your first assignment</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="specialty-panel">
+        <div class="dossier-section-title">🏷 Jutsu Specialties</div>
+        <div class="specialty-grid" id="profileTagList">
+          <div class="specialty-chip">
+            <span class="seal-dot"></span>
+            <span>No specialties</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dossier-columns">
+      <div class="mission-panel">
+        <div class="dossier-section-title">⚙ Account</div>
+        <div class="mission-scroll">
+          <div class="mission-item"><div class="mission-rank s">ID</div><div class="mission-body"><div class="mission-title">Username</div><div class="mission-time" id="profileAccountUsername">—</div></div></div>
+          <div class="mission-item"><div class="mission-rank a">✓</div><div class="mission-body"><div class="mission-title">Email verification</div><div class="mission-time" id="profileAccountVerification">—</div></div></div>
+          <div class="mission-item"><div class="mission-rank d">◆</div><div class="mission-body"><div class="mission-title">Account email</div><div class="mission-time" id="profileAccountEmail">—</div></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsLogoutModal" role="dialog" aria-modal="true" aria-labelledby="settingsLogoutTitle">
+  <div class="modal">
+    <h3 id="settingsLogoutTitle">Log out of Konoha Notes?</h3>
+    <p>Your private scrolls will be hidden until you sign in again.</p>
+    <p class="settings-feedback" id="settingsLogoutFeedback" role="status" aria-live="polite"></p>
+    <div class="modal-btns">
+      <button class="modal-btn" id="settingsLogoutCancelButton" type="button" onclick="closeSettingsLogout()">Cancel</button>
+      <button class="modal-btn confirm" id="settingsLogoutConfirmButton" type="button" onclick="confirmSettingsLogout()">Log out</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SETTINGS VIEW ==================== -->
+<div class="view" id="view-settings">
+  <main class="settings-page">
+    <header class="settings-heading">
+      <div class="section-tag">Account control // Konoha Archives</div>
+      <h1 class="section-title">Shinobi <span>Settings</span></h1>
+      <p class="section-lead">Manage your account and security in one place.</p>
+    </header>
+
+    <section class="settings-card settings-verification-only" id="settingsVerificationOnly" style="display:none" aria-labelledby="settingsVerifyTitle">
+      <div class="settings-card-heading"><div><div class="dossier-section-title" id="settingsVerifyTitle">✉ Email verification required</div><p class="settings-description">Verify your email to unlock private scrolls and account settings.</p></div></div>
+      <div class="settings-email-row"><span>Email</span><strong id="settingsVerifyEmail">—</strong><span id="settingsVerifyStatus" class="settings-status-pill">Not verified</span></div>
+      <div class="settings-actions">
+        <button class="btn btn-secondary btn-sm" type="button" id="settingsResendVerificationButton">Resend verification email</button>
+        <button class="btn btn-ghost btn-sm" type="button" id="settingsCheckVerificationButton">I’ve verified my email</button>
+      </div>
+      <p class="settings-feedback" id="settingsVerifyFeedback" role="status" aria-live="polite"></p>
+      <button class="btn btn-danger btn-sm settings-logout-button" type="button" onclick="promptSettingsLogout()">Log out</button>
+    </section>
+
+    <div class="settings-grid" id="settingsFullContent">
+      <section class="settings-card" aria-labelledby="settingsProfileTitle">
+        <div class="settings-card-heading"><div><div class="dossier-section-title" id="settingsProfileTitle">⚙ Edit profile</div><p class="settings-description">Update the profile information shown across your Konoha account.</p></div></div>
+        <div class="settings-field"><label for="settingsDisplayName">Display name</label><input class="settings-input" id="settingsDisplayName" type="text" maxlength="120" autocomplete="name"/></div>
+        <div class="settings-field"><label for="settingsClan">Role or clan</label><input class="settings-input" id="settingsClan" type="text" maxlength="80" autocomplete="organization-title"/></div>
+        <div class="settings-field"><label for="settingsUsername">Username</label><input class="settings-input settings-readonly" id="settingsUsername" type="text" readonly aria-describedby="settingsUsernameHelp"/><small id="settingsUsernameHelp">Usernames are reserved for uniqueness and can’t be changed here.</small></div>
+        <button class="btn btn-primary btn-sm" id="settingsSaveProfileButton" type="button">Save profile</button>
+        <p class="settings-feedback" id="settingsProfileFeedback" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="settings-card" aria-labelledby="settingsEmailTitle">
+        <div class="settings-card-heading"><div><div class="dossier-section-title" id="settingsEmailTitle">✉ Email &amp; verification</div><p class="settings-description">Your email is managed by Firebase Authentication.</p></div></div>
+        <div class="settings-email-row"><span>Current email</span><strong id="settingsCurrentEmail">—</strong></div>
+        <div class="settings-email-row"><span>Verification</span><span id="settingsVerificationStatus" class="settings-status-pill">—</span></div>
+        <div id="settingsVerifiedActions">
+          <div class="settings-field"><label for="settingsNewEmail">Change email</label><input class="settings-input" id="settingsNewEmail" type="email" autocomplete="email" placeholder="new@email.com"/><small>A verification link will be sent to the new address.</small></div>
+          <div class="settings-field" id="settingsEmailCurrentPasswordField"><label for="settingsEmailCurrentPassword">Current password</label><input class="settings-input" id="settingsEmailCurrentPassword" type="password" autocomplete="current-password"/></div>
+          <button class="btn btn-secondary btn-sm" id="settingsChangeEmailButton" type="button">Send verification link</button>
+          <button class="btn btn-ghost btn-sm" id="settingsRefreshEmailButton" type="button">Refresh email status</button>
+          <p class="settings-feedback" id="settingsEmailFeedback" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="settings-card" aria-labelledby="settingsSecurityTitle">
+        <div class="settings-card-heading"><div><div class="dossier-section-title" id="settingsSecurityTitle">🔒 Password &amp; security</div><p class="settings-description">Use a current password to make a security-sensitive change.</p></div></div>
+        <div id="settingsPasswordForm">
+          <div class="settings-field"><label for="settingsCurrentPassword">Current password</label><input class="settings-input" id="settingsCurrentPassword" type="password" autocomplete="current-password"/></div>
+          <div class="settings-field"><label for="settingsNewPassword">New password</label><input class="settings-input" id="settingsNewPassword" type="password" autocomplete="new-password" minlength="10" aria-describedby="settingsPasswordHelp"/><small id="settingsPasswordHelp">Use at least 10 characters.</small></div>
+          <div class="settings-field"><label for="settingsConfirmPassword">Confirm new password</label><input class="settings-input" id="settingsConfirmPassword" type="password" autocomplete="new-password" minlength="10"/></div>
+          <button class="btn btn-primary btn-sm" id="settingsChangePasswordButton" type="button">Change password</button>
+          <p class="settings-feedback" id="settingsPasswordFeedback" role="status" aria-live="polite"></p>
+        </div>
+        <p class="settings-description" id="settingsProviderMessage" style="display:none">Password changes are managed by your connected sign-in provider.</p>
+        <div class="settings-reset-row" id="settingsResetRow"><div><strong>Forgot your password?</strong><p class="settings-description">Send a reset link to your account email.</p></div><button class="btn btn-ghost btn-sm" id="settingsResetPasswordButton" type="button">Send reset email</button></div>
+        <p class="settings-feedback" id="settingsResetFeedback" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="settings-card settings-account-actions" aria-labelledby="settingsActionsTitle">
+        <div class="settings-card-heading"><div><div class="dossier-section-title" id="settingsActionsTitle">⛩ Account actions</div><p class="settings-description">Sign out of this Konoha account on this browser.</p></div></div>
+        <button class="btn btn-danger btn-sm" type="button" id="settingsLogoutButton" onclick="promptSettingsLogout()">Log out</button>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== NOTES VIEW ==================== -->
+<div class="view" id="view-notes">
+  <div class="notes-sidebar">
+    <div class="notes-sidebar-header">
+      <div class="notes-sidebar-title"><span>My Scrolls</span><span id="noteCount" style="font-size:0.7rem;color:var(--text3)">0</span></div>
+      <input class="notes-search" type="text" id="notesSearch" aria-label="Search notes" placeholder="Search scrolls..." oninput="filterNotes()"/>
+    </div>
+    <div class="notes-filter-tabs">
+      <button class="filter-tab active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-tab" onclick="setFilter('pinned',this)">Pinned</button>
+      <button class="filter-tab" onclick="setFilter('recent',this)">Recent</button>
+    </div>
+    <div class="notes-list" id="notesList"></div>
+    <button class="new-note-btn" id="newNoteBtn" onclick="createNote()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>New Scroll
+    </button>
+  </div>
+  <div class="notes-editor" id="notesEditor">
+    <div class="editor-empty" id="editorEmpty">
+      <svg viewBox="0 0 80 80" fill="none"><path d="M40 10 Q50 20 45 40 Q50 60 40 70 Q30 60 35 40 Q30 20 40 10Z" stroke="#C0392B" stroke-width="1.5" fill="rgba(192,57,43,0.05)"/><circle cx="40" cy="40" r="30" stroke="rgba(192,57,43,0.2)" stroke-width="1" stroke-dasharray="4,4"/><circle cx="40" cy="40" r="6" fill="rgba(192,57,43,0.3)"/></svg>
+      <h3 id="editorEmptyTitle">No Scroll Selected</h3>
+      <p id="editorEmptyText">Create a new scroll or select an existing one to begin writing your secrets.</p>
+      <button class="btn btn-primary btn-sm" id="editorEmptyBtn" onclick="createNote()" style="margin-top:8px">Create First Scroll</button>
+    </div>
+    <div id="editorActive" style="display:none;flex-direction:column;height:100%;overflow:hidden">
+      <div class="editor-toolbar">
+        <button class="mobile-back-btn" type="button" onclick="toggleMobileNotesList()" aria-label="Show saved scrolls" aria-controls="notesList">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          Scrolls
+        </button>
+        <input class="editor-title-input" type="text" id="noteTitleInput" aria-label="Note title" placeholder="Scroll Title..." oninput="updateNoteTitle()"/>
+        <div class="toolbar-actions">
+          <button class="toolbar-btn" id="pinBtn" onclick="togglePin()">📌 Pin</button>
+          <button class="toolbar-btn" id="readBtn" onclick="toggleReadMode()">👁 Read</button>
+          <button class="toolbar-btn save-btn" onclick="saveNote()">⚡ Seal</button>
+          <button class="toolbar-btn danger" onclick="promptDelete()">🔥 Burn</button>
+        </div>
+      </div>
+      <div class="format-bar">
+        <button class="fmt-btn" onclick="fmt('bold')" title="Bold" aria-label="Bold"><b>B</b></button>
+        <button class="fmt-btn" onclick="fmt('italic')" title="Italic" aria-label="Italic"><i>I</i></button>
+        <button class="fmt-btn" onclick="fmt('underline')" title="Underline" aria-label="Underline"><u>U</u></button>
+        <div class="fmt-sep"></div>
+        <button class="fmt-btn" onclick="fmtHeading(1)" title="H1" style="font-size:11px">H1</button>
+        <button class="fmt-btn" onclick="fmtHeading(2)" title="H2" style="font-size:10px">H2</button>
+        <button class="fmt-btn" onclick="fmtHeading(3)" title="H3" style="font-size:9px">H3</button>
+        <div class="fmt-sep"></div>
+        <button class="fmt-btn" onclick="fmtList('ul')" title="Bullets" aria-label="Bulleted list">≡</button>
+        <button class="fmt-btn" onclick="fmtList('ol')" title="Numbers" aria-label="Numbered list">1.</button>
+        <button class="fmt-btn" onclick="fmtQuote()" title="Quote">❝</button>
+        <div class="fmt-sep"></div>
+        <button class="fmt-btn" onclick="fmtCode()" title="Code" aria-label="Code" style="font-size:11px">{ }</button>
+        <button class="fmt-btn" onclick="fmtLink()" title="Link" aria-label="Insert link">🔗</button>
+        <button class="fmt-btn" onclick="fmtRule()" title="Divider" aria-label="Insert divider">—</button>
+        <div class="fmt-sep"></div>
+        <select id="fontSelect" onchange="changeFont()" style="background:var(--surf3);border:1px solid var(--border);color:var(--text2);padding:4px 8px;border-radius:2px;font-size:12px;cursor:pointer;outline:none">
+          <option value="var(--font-body)">Crimson</option>
+          <option value="var(--font-display)">Cinzel</option>
+          <option value="var(--font-jp)">Japanese</option>
+          <option value="monospace">Mono</option>
+        </select>
+      </div>
+      <div class="editor-tags" id="tagsBar">
+        <span style="font-size:0.75rem;color:var(--text3);font-family:var(--font-display);letter-spacing:0.1em">TAGS:</span>
+        <div id="tagsList"></div>
+        <input class="tag-input" type="text" id="tagInput" aria-label="Add a note tag" placeholder="Add tag..." onkeydown="handleTagInput(event)"/>
+      </div>
+      <div class="editor-body" id="editorBodyDiv">
+        <div id="note-content-editor" role="textbox" aria-label="Note content" aria-multiline="true" contenteditable="true" spellcheck="true"
+          style="outline:none;width:100%;max-width:760px;margin:0 auto;min-height:400px;font-family:var(--font-body);font-size:1.1rem;color:var(--text1);line-height:1.9"
+          onkeydown="handleEditorKey(event)" oninput="onContentChange()">
+        </div>
+      </div>
+      <div class="wordcount-bar">
+        <span id="wordCount">0 words</span>
+        <span id="charCount">0 characters</span>
+        <span id="lastSaved" style="margin-left:auto">Not sealed</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- STORY MODAL -->
+<div class="story-modal-overlay" id="storyModal" onclick="closeStoryModal(event)">
+  <div class="story-modal-content" onclick="event.stopPropagation()">
+    <button class="story-modal-close" onclick="closeStoryModal()" aria-label="Close story">✕</button>
+    <div class="story-modal-img-wrap" id="storyModalImgWrap" style="display:none">
+      <img id="storyModalImg" src="" alt=""/>
+      <div class="story-modal-img-border"></div>
+      <div class="story-modal-img-shimmer"></div>
+    </div>
+    <div class="story-modal-line"></div>
+    <h2 class="story-modal-title" id="storyModalTitle"></h2>
+    <div class="story-modal-subtitle" id="storyModalSubtitle"></div>
+    <div class="story-modal-text" id="storyModalText"></div>
+  </div>
+</div>
+
+  <script defer src="assets/js/legacy-ui.js?v=20261005-3"></script>
+  <script defer src="firebase/firebase-config.js"></script>
+  <script type="module" src="src/app/bootstrap/application.js"></script>
+</body>
+</html>
+

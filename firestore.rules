@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedInAs(uid) { return request.auth != null && request.auth.uid == uid; }
+    function verified() { return request.auth != null && request.auth.token.email_verified == true; }
+    function validTag(tags, index) {
+      return tags.size() <= index || (tags[index] is string && tags[index].size() <= 40);
+    }
+    function validTags(tags) {
+      return tags is list && tags.size() <= 20
+        && validTag(tags, 0) && validTag(tags, 1) && validTag(tags, 2) && validTag(tags, 3)
+        && validTag(tags, 4) && validTag(tags, 5) && validTag(tags, 6) && validTag(tags, 7)
+        && validTag(tags, 8) && validTag(tags, 9) && validTag(tags, 10) && validTag(tags, 11)
+        && validTag(tags, 12) && validTag(tags, 13) && validTag(tags, 14) && validTag(tags, 15)
+        && validTag(tags, 16) && validTag(tags, 17) && validTag(tags, 18) && validTag(tags, 19);
+    }
+    function validProfile(uid) {
+      return request.resource.data.keys().hasOnly(['uid', 'displayName', 'username', 'email', 'photoURL', 'clan', 'createdAt', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 120
+        && request.resource.data.username is string && request.resource.data.username.matches('^[a-z0-9_]{3,40}$')
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.clan is string && request.resource.data.clan.size() <= 80
+        && exists(/databases/$(database)/documents/usernames/$(request.resource.data.username))
+        && get(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
+    }
+    function validNote() {
+      return request.resource.data.keys().hasOnly(['title', 'content', 'tags', 'isPinned', 'color', 'createdAt', 'updatedAt'])
+        && request.resource.data.title is string && request.resource.data.title.size() <= 255
+        && request.resource.data.content is string && request.resource.data.content.size() <= 180000
+        && validTags(request.resource.data.tags)
+        && request.resource.data.isPinned is bool
+        && request.resource.data.color is string && request.resource.data.color in ['default']
+        && request.resource.data.createdAt is timestamp && request.resource.data.updatedAt is timestamp;
+    }
+
+    match /users/{uid} {
+      allow read: if signedInAs(uid);
+      allow create: if signedInAs(uid) && validProfile(uid)
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+      allow update: if signedInAs(uid) && validProfile(uid)
+        && request.resource.data.username == resource.data.username
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+
+      match /notes/{noteId} {
+        allow read: if signedInAs(uid) && verified();
+        allow create: if signedInAs(uid) && verified() && validNote()
+          && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+        allow update: if signedInAs(uid) && verified() && validNote()
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if signedInAs(uid) && verified();
+      }
+    }
+
+    match /usernames/{username} {
+      allow read: if false;
+      allow create: if request.auth != null
+        && username.matches('^[a-z0-9_]{3,40}$')
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/usernames/$(username));
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == resource.data.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/users/$(resource.data.uid));
+    }
+  }
+}

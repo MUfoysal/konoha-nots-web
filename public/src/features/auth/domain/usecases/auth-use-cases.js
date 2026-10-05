@@ -1,0 +1,10 @@
+export const observeAuth = repository => callback => repository.observe(callback);
+export const registerUser = (repository, input) => repository.register(input);
+export const loginUser = (repository, input) => repository.login(input);
+export const loginWithGoogle = repository => repository.loginWithGoogle();
+export const logoutUser = repository => repository.logout();
+export const resetPassword = (repository, email) => repository.sendPasswordReset(email);
+export const resendVerification = repository => repository.resendVerification();
+export const reloadCurrentUser = repository => repository.reloadCurrentUser();
+export const getCurrentUser = repository => repository.getCurrentUser();
+export const checkEmailVerification = user => Boolean(user?.emailVerified);

@@ -1,0 +1,15 @@
+{
+  "name": "konoha-notes/application",
+  "description": "Konoha Notes secure multi-user application",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "ext-curl": "*",
+    "ext-mbstring": "*",
+    "ext-openssl": "*",
+    "ext-pdo_mysql": "*"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
