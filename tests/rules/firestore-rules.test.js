@@ -67,3 +67,26 @@ test('username claims are private, owner-bound, and cannot be taken twice', asyn
   await assertFails(setDoc(doc(second, 'usernames', 'leaf_writer'), { uid: 'second' }));
   await assertFails(getDoc(doc(second, 'usernames', 'leaf_writer')));
 });
+
+
+test('users can read only their own profile and cannot change its UID', async () => {
+  const owner = environment.authenticatedContext('profile-owner', { email: 'owner@example.test' }).firestore();
+  await assertSucceeds(setDoc(doc(owner, 'usernames', 'profile_owner'), { uid: 'profile-owner' }));
+  const profile = doc(owner, 'users', 'profile-owner');
+  await assertSucceeds(setDoc(profile, {
+    uid: 'profile-owner', displayName: 'Owner', username: 'profile_owner', email: 'owner@example.test',
+    photoURL: null, clan: 'Ronin', createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(profile));
+  const other = environment.authenticatedContext('profile-reader', { email: 'reader@example.test' }).firestore();
+  await assertFails(getDoc(doc(other, 'users', 'profile-owner')));
+  await assertFails(updateDoc(doc(other, 'users', 'profile-owner'), { displayName: 'Intruder', updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(profile, { uid: 'profile-reader', updatedAt: serverTimestamp() }));
+});
+
+test('note creation timestamps cannot be changed after creation', async () => {
+  const db = environment.authenticatedContext('timestamp-owner', { email: 't@example.test', email_verified: true }).firestore();
+  const reference = doc(collection(db, 'users', 'timestamp-owner', 'notes'));
+  await assertSucceeds(setDoc(reference, noteData()));
+  await assertFails(updateDoc(reference, { createdAt: new Date(0), updatedAt: serverTimestamp() }));
+});

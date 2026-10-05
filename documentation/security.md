@@ -13,3 +13,7 @@
 ## Review limitations
 
 Rules are written but emulator execution and a Firebase Console review are still pending. Rich-text safety has domain/source coverage but needs browser test cases against malformed HTML. Production App Check enforcement, provider/domain settings, and abuse controls depend on the real Firebase project.
+
+## Content Security Policy
+
+No enforcing CSP is configured yet. The current page uses inline event-handler attributes and inline style attributes, loads Firebase SDK modules from `www.gstatic.com`, fonts from Google Fonts, and story imagery through external proxy URLs. A policy that allows inline scripts/styles with `unsafe-inline` would weaken the protection CSP is meant to provide. Add an enforcing policy only after replacing inline handlers/styles with bound modules and documenting the required Firebase, font, and image origins. No CSP workaround is enabled in Hosting or Apache headers.

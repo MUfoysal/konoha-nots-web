@@ -1015,6 +1015,7 @@ document.addEventListener('keydown',e=>{
 window.addEventListener('load',()=>{
   initHeroCanvas();
   initScrollObserver();
+  initKeyboardCardAccess();
   
 });
 
@@ -1052,16 +1053,26 @@ document.addEventListener('keydown',e=>{
 });
 
 
+function initKeyboardCardAccess(){
+  const cards = [
+    ...document.querySelectorAll('#history .timeline-item[data-story], #clans .clan-card[data-story], #legends .legend-card[data-story]'),
+  ];
+  const notesStatCard = document.querySelector('#view-profile .chakra-card');
+  if (notesStatCard) cards.push(notesStatCard);
+  cards.forEach(card => {
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (event.target !== card) return;
+      event.preventDefault();
+      card.click();
+    });
+  });
+}
+
 // ==================== STORY MODAL ====================
 function initStoryCards(){
-  // Clan cards
-  document.querySelectorAll('#clans .clan-card[data-story]').forEach(card => {
-    card.addEventListener('click', () => openStoryModal(card));
-  });
-  // Legend cards
-  document.querySelectorAll('#legends .legend-card[data-story]').forEach(card => {
-    card.addEventListener('click', () => openStoryModal(card));
-  });
   // History timeline items - click on the card-view-overlay button
   document.querySelectorAll('#history .timeline-item[data-story] .card-view-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -1072,8 +1083,11 @@ function initStoryCards(){
   });
 }
 
+let lastStoryTrigger = null;
+
 function openStoryModal(card){
   const story = card.dataset.story;
+  lastStoryTrigger = card;
   if(!story) return;
   const titleEl = card.querySelector('.clan-name, .legend-name, .timeline-name');
   const subtitleEl = card.querySelector('.clan-name-jp, .legend-title, .timeline-era');
@@ -1111,6 +1125,7 @@ function openStoryModal(card){
   const modal = document.getElementById('storyModal');
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
+  modal.querySelector('.story-modal-close')?.focus();
 }
 
 function closeStoryModal(e){
@@ -1119,6 +1134,8 @@ function closeStoryModal(e){
   if(!modal) return;
   modal.classList.remove('open');
   document.body.style.overflow = '';
+  lastStoryTrigger?.focus();
+  lastStoryTrigger = null;
   setTimeout(() => {
     const textEl = document.getElementById('storyModalText');
     const imgEl = document.getElementById('storyModalImg');

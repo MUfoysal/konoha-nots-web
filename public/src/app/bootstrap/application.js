@@ -13,6 +13,7 @@ import { FirebaseSettingsDataSource } from '../../features/settings/data/datasou
 import { FirebaseSettingsRepository } from '../../features/settings/data/repositories/firebase-settings-repository.js';
 import { SettingsController } from '../../features/settings/presentation/controllers/settings-controller.js';
 
+let deleteModalTrigger = null;
 let authController;
 let notesController;
 let settingsController;
@@ -287,9 +288,9 @@ window.openNote = id => {
     sidebar?.classList.add('drawer-hidden');
   }
 };
-window.promptDelete = () => { if (!requirePrivateAccess()) return; window.deleteTargetId = window.activeNoteId; byId('deleteModal')?.classList.add('open'); };
-window.deleteNoteById = (id, event) => { event?.stopPropagation(); if (!requirePrivateAccess()) return; window.deleteTargetId = id; byId('deleteModal')?.classList.add('open'); };
-window.closeDeleteModal = () => { byId('deleteModal')?.classList.remove('open'); window.deleteTargetId = null; };
+window.promptDelete = () => { if (!requirePrivateAccess()) return; deleteModalTrigger = document.activeElement; window.deleteTargetId = window.activeNoteId; byId('deleteModal')?.classList.add('open'); byId('deleteModal')?.querySelector('button')?.focus(); };
+window.deleteNoteById = (id, event) => { event?.stopPropagation(); if (!requirePrivateAccess()) return; deleteModalTrigger = event?.currentTarget || document.activeElement; window.deleteTargetId = id; byId('deleteModal')?.classList.add('open'); byId('deleteModal')?.querySelector('button')?.focus(); };
+window.closeDeleteModal = () => { byId('deleteModal')?.classList.remove('open'); window.deleteTargetId = null; deleteModalTrigger?.focus?.(); deleteModalTrigger = null; };
 window.updatePinBtn = pinned => { const button = byId('pinBtn'); if (button) { button.textContent = pinned ? '📌 Unpin' : '📌 Pin'; button.classList.toggle('active', pinned); } };
 window.updateReadBtn = () => { const button = byId('readBtn'); if (button) { button.textContent = window.isReadMode ? '✏️ Edit' : '👁 Read'; button.classList.toggle('active', !!window.isReadMode); } };
 window.toggleReadMode = () => {
@@ -441,6 +442,10 @@ function addGoogleButtons() {
     const anchor = form.querySelector('#lfoot,#rfoot'); if (anchor) anchor.before(button); else form.appendChild(button);
   });
 }
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && byId('deleteModal')?.classList.contains('open')) window.closeDeleteModal();
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   window.initStoryCards?.();

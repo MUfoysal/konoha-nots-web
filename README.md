@@ -60,7 +60,7 @@ Full details and security rationale are in [architecture.md](documentation/archi
 
 1. Install Node.js 20 or later, Java JDK 11 or later, and the Firebase CLI (`npm install --global firebase-tools`). Install the project test dependencies with `npm install`.
 2. Create a Firebase project and Web App. Enable Email/Password and Google providers in Firebase Authentication.
-3. Replace placeholders in `public/firebase/firebase-config.js`. Firebase Web config values are public identifiers; never put Admin SDK keys or service-account JSON here.
+3. Use the existing public Web App configuration in `public/firebase/firebase-config.js`; verify provider settings and authorized domains in Firebase Console. Firebase Web config values are public identifiers; never put Admin SDK keys or service-account JSON here.
 4. For emulators, enable `KONOHA_USE_EMULATORS` in that file and set a local emulator-only Firebase config. Run `npm run emulators` in one terminal.
 5. Serve the project from its root with Firebase Hosting Emulator (`http://127.0.0.1:5000`) so module imports and Auth authorized-domain behavior are consistent.
 6. Run `npm test` for pure domain tests. Run `npm run test:rules` for Firestore Security Rules tests against the emulator.
@@ -69,7 +69,7 @@ The Firebase CLI is installed separately because it is a developer/deployment to
 
 ## Hosting deployment
 
-Configure the Firebase project with `firebase use --add`, replace Web config placeholders, enable providers, and deploy `firebase deploy --only firestore:rules,firestore:indexes,hosting`. The Hosting root is `public/`; PHP files, dotfiles, and private project folders are not deployed. Set authorized domains and test email verification/reset templates before launch. See [deployment.md](documentation/deployment.md).
+Select the Firebase project with `firebase use --add`, enable providers, review rules, and deploy `firebase deploy --only firestore:rules,firestore:indexes,hosting`. The Hosting root is `public/`; PHP files, dotfiles, and private project folders are not deployed. Set authorized domains and test email verification/reset templates before launch. See [deployment.md](documentation/deployment.md).
 
 ## Testing and QA
 
@@ -77,7 +77,7 @@ Configure the Firebase project with `firebase use --add`, replace Web config pla
 
 ## Known limitations
 
-- Firebase configuration and provider settings are project-specific and not verified here.
+- Firebase Web configuration targets `konoha-nots`; provider settings, authorized domains, browser E2E flows, deployed rules, and production deployment are not verified here.
 - Existing MySQL accounts/notes and any browser localStorage data have not been imported. Legacy password hashes cannot be reused as Firebase passwords; users must create Firebase accounts. Export and explicitly reassign existing note content before retiring the old database.
 - Search and filters load the signed-in user's notes and operate in memory, matching the existing behavior. This is not a paginated strategy for very large note collections.
 - The existing profile activity list is derived from note timestamps, not a separately stored audit/event history.
@@ -85,6 +85,18 @@ Configure the Firebase project with `firebase use --add`, replace Web config pla
 - Rich-text sanitization is client-side because there is no trusted PHP API after migration. Firestore rules also require bounded note fields; rules cannot replace thorough client-side sanitization.
 - No Firebase Storage or Cloud Functions are used because the app currently has no uploads or trusted server-only workflow.
 - PHP/MySQL files remain temporarily as rollback/reference code until Firebase emulator and project-backed browser verification succeeds. The active frontend no longer calls the PHP API.
+
+## Screenshots
+
+Screenshots are not included yet. Add authentic desktop and mobile captures here after recording them from the running app.
+
+## Legacy backend status
+
+The PHP/MySQL API and schema remain in the repository as rollback/reference material. The active browser frontend does not call the PHP API; `deployment.md` still documents that backend. Keep it until Firebase migration equivalence and data-retention decisions are confirmed.
+
+## License
+
+No license file is currently present. For a public portfolio repository, consider MIT if you intend to allow reuse and modification; choose only after confirming rights to all included code and assets.
 
 ## Future improvements
 

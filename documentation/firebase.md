@@ -10,7 +10,7 @@
 
 ## Configuration
 
-`public/firebase/firebase-config.js` contains public Firebase Web App settings, which browsers must receive. Replace its placeholders from Firebase Console. Never add Admin credentials, a service-account JSON file, or private API keys to the frontend. Google sign-in additionally requires enabling the Google provider and authorized domains.
+`public/firebase/firebase-config.js` contains the public Web App configuration for project `konoha-nots`. These client identifiers are expected to be visible in the browser. Never add Admin credentials, a service-account JSON file, or private API keys to the frontend. Google sign-in requires an enabled provider and authorized domains; those Console settings have not been verified here.
 
 For emulators, uncomment `KONOHA_USE_EMULATORS` in the config. The application connects to Auth on 9099 and Firestore on 8080. Hosting runs on 5000. Do not point emulator-enabled builds at production resources.
 

@@ -12,14 +12,6 @@
 
 
 <base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
-<base target="_blank">
   <link rel="stylesheet" href="assets/css/app.css?v=20261005-3">
 </head>
 <body>
@@ -69,9 +61,9 @@
 <div id="toast-container"></div>
 
 <!-- DELETE MODAL -->
-<div class="modal-overlay" id="deleteModal">
+<div class="modal-overlay" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
   <div class="modal">
-    <h3>Seal &amp; Destroy?</h3>
+    <h3 id="deleteModalTitle">Seal &amp; Destroy?</h3>
     <p>This scroll will be burned and unsealed forever. Even the Hokage cannot reverse this jutsu.</p>
     <div class="modal-btns">
       <button class="modal-btn" onclick="closeDeleteModal()">Cancel</button>
@@ -793,7 +785,7 @@
 
 
 <!-- STORY MODAL -->
-<div class="story-modal-overlay" id="storyModal" onclick="closeStoryModal(event)">
+<div class="story-modal-overlay" id="storyModal" role="dialog" aria-modal="true" aria-labelledby="storyModalTitle" onclick="closeStoryModal(event)">
   <div class="story-modal-content" onclick="event.stopPropagation()">
     <button class="story-modal-close" onclick="closeStoryModal()" aria-label="Close story">✕</button>
     <div class="story-modal-img-wrap" id="storyModalImgWrap" style="display:none">

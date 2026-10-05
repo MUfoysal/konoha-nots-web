@@ -1491,6 +1491,10 @@ body.intro-done #nav{
   transition:all 0.4s cubic-bezier(0.22,1,0.36,1);
   cursor:pointer;
 }
+.timeline-item[role="button"]:focus-visible,.clan-card[role="button"]:focus-visible,.legend-card[role="button"]:focus-visible,.chakra-card[role="button"]:focus-visible{
+  outline:2px solid var(--red);
+  outline-offset:4px;
+}
 .chakra-card:hover{
   border-color:var(--red);
   transform:translateY(-6px);
