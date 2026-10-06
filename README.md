@@ -1,103 +1,684 @@
-# Konoha Notes
+# 🍃 Konoha Notes
 
-Naruto-themed personal notes app with the original visual design, Firebase Authentication, and private Cloud Firestore notes. The frontend is plain HTML, CSS, and modular JavaScript; no UI framework or application server is required.
+A Naruto-themed personal notes application built around a custom cinematic interface, Firebase Authentication, and private Cloud Firestore storage.
 
-> **Verification status:** `public/firebase/firebase-config.js` is configured for the `konoha-nots` Firebase Web App. Firebase App, Auth, and Firestore initialization passed an SDK check, but browser authentication, Firestore CRUD, security-rule enforcement, and deployment remain **unverified**.
+The application uses plain HTML, CSS, and modular JavaScript without a UI framework or application server. The original visual design is preserved while the application logic has been organized around a feature-based architecture.
 
-## Features
+> **Project Status:** Local development and the main application flows have been verified. Unit tests, Firestore Security Rules emulator tests, JavaScript syntax checks, and browser smoke testing are passing. Production Firebase Hosting deployment is not yet verified.
 
-- Email/password registration, email verification, sign-in, password reset, verification resend, and Google popup sign-in.
-- Private note creation, reading, editing, deletion, formatted content, tags, pinning, search, pinned/recent filters, and pinned-first/recent sorting.
-- Profile statistics derived from the current user's note documents.
-- Registration uses unique usernames; Firebase email/password sign-in uses the account email.
-- Firebase Auth persistence and Firestore rules that scope access to the authenticated UID; note operations require a verified email.
-- Firebase Hosting and Auth/Firestore/Hosting Emulator Suite configuration.
+---
 
-## Technology
+## ✨ Features
 
-- HTML, CSS, vanilla JavaScript modules.
-- Firebase JavaScript SDK modular CDN imports (12.19.0).
-- Firebase Authentication, Cloud Firestore, optional App Check, and Firebase Hosting.
-- Node's built-in test runner for domain tests; Firebase Rules Unit Testing and Firebase CLI for emulator tests.
+### 🔐 Authentication
 
-## Architecture and folders
+* Email/password registration
+* Email verification
+* Verified-email login
+* Password reset
+* Verification email resend
+* Google popup sign-in
+* Firebase Auth persistence
+* Protected application routes
+* Guest/public navigation
+* Logout and authenticated-state handling
+* Unique username registration
+
+### 📝 Notes
+
+* Create notes
+* Read notes
+* Edit notes
+* Delete notes
+* Rich-text note content
+* Tags
+* Pin/unpin notes
+* Search
+* Pinned/recent filters
+* Pinned-first/recent sorting
+* Persistent Firestore storage
+* User-specific note isolation
+
+### 👤 Profile
+
+* Firebase user information
+* Username
+* Clan information
+* Profile statistics
+* Note-derived activity information
+
+### ⚙️ Settings
+
+* Account management
+* Authentication-related actions
+* Password reset
+* Logout
+* Application management
+
+### 🛡️ Security
+
+* Firebase Authentication
+* UID-based Firestore ownership
+* Verified-email requirement for notes
+* Private username claims
+* Cross-user access protection
+* Immutable user ownership
+* Protected timestamps
+* Firestore field validation
+* Client-side HTML sanitization
+* No application password/session storage
+
+---
+
+## 🖥️ Screenshots
+
+The following screenshots were captured from the current Konoha Notes application.
+
+### Home
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/homehero.png" width="100%" alt="Konoha Notes — Home Hero and Navigation">
+      <br><br>
+      <strong>Hero & Navigation</strong>
+    </td>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/features.png" width="100%" alt="Konoha Notes — Features Section">
+      <br><br>
+      <strong>Features</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/clans.png" width="100%" alt="Konoha Notes — Clans Section">
+      <br><br>
+      <strong>Clans</strong>
+    </td>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/shinobi.png" width="100%" alt="Konoha Notes — Shinobi Section">
+      <br><br>
+      <strong>Shinobi / Story</strong>
+    </td>
+  </tr>
+</table>
+
+### Application
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/myscrool.png" width="100%" alt="Konoha Notes — My Scroll">
+      <br><br>
+      <strong>My Scroll</strong>
+    </td>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/nots.png" width="100%" alt="Konoha Notes — Notes Dashboard">
+      <br><br>
+      <strong>Notes Dashboard</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/login.png" width="100%" alt="Konoha Notes — Login">
+      <br><br>
+      <strong>Login</strong>
+    </td>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/signin.png" width="100%" alt="Konoha Notes — Sign In and Registration">
+      <br><br>
+      <strong>Sign In / Registration</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/profile.png" width="100%" alt="Konoha Notes — Profile">
+      <br><br>
+      <strong>Profile</strong>
+    </td>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/settings.png" width="100%" alt="Konoha Notes — Settings">
+      <br><br>
+      <strong>Settings</strong>
+    </td>
+  </tr>
+</table>
+
+> Mobile-specific screenshots can be added later when available.
+
+---
+
+## 🧰 Technology Stack
+
+| Category           | Technology                                    |
+| ------------------ | --------------------------------------------- |
+| Frontend           | HTML5, CSS3, JavaScript                       |
+| Architecture       | Feature-based / Clean Architecture principles |
+| Authentication     | Firebase Authentication                       |
+| Database           | Cloud Firestore                               |
+| SDK                | Firebase JavaScript SDK 12.19.0               |
+| Hosting            | Firebase Hosting                              |
+| Testing            | Node.js Test Runner                           |
+| Security Testing   | Firebase Rules Unit Testing                   |
+| Local Development  | Firebase Emulator Suite                       |
+| Package Management | npm                                           |
+| Version Control    | Git / GitHub                                  |
+
+No frontend UI framework is used.
+
+---
+
+## 🏗️ Architecture
+
+The application follows a feature-based architecture inspired by Clean Architecture.
 
 ```text
-public/
-├── index.html                 Existing page and view markup
-├── assets/css/app.css         Existing visual system
-├── assets/js/legacy-ui.js     Retained shared visual/editor behaviors; no localStorage auth or note persistence
-├── firebase/                  Public Web config and example
-└── src/
-    ├── core/                  Firebase initialization, errors, HTML sanitization
-    ├── features/
-    │   ├── auth/               Domain contract/use cases, Firebase adapter, UI controller
-    │   ├── notes/              Note rules, repository, Firestore adapter, UI controller
-    │   └── profile/            Pure note-derived statistics
-    └── app/bootstrap/          Composition root and bindings to existing UI
-firestore.rules                UID ownership, verified-email and field validation
-firebase.json                  Hosting, headers, emulator and deploy configuration
-tests/                          Domain and Firestore-rules tests
-documentation/                  Audit, architecture, Firebase, security, deployment
+Presentation
+     ↓
+  Domain
+     ↓
+    Data
 ```
 
-Dependency direction is presentation → domain → data. Firebase SDK imports are limited to Firebase initialization and data sources. The profile retains the existing visual renderer while its statistics calculation is a pure domain use case.
+The domain layer remains independent from Firebase-specific implementation details.
 
-## Firebase model and data flow
+### Project Structure
 
-- `users/{uid}` contains `uid`, `displayName`, `username`, `email`, `photoURL`, `clan`, `createdAt`, `updatedAt`; `usernames/{lowercaseUsername}` reserves unique names without exposing email addresses.
-- `users/{uid}/notes/{noteId}` contains `title`, sanitized `content`, `tags`, `isPinned`, `color`, `createdAt`, `updatedAt`.
-- A note event flows through the existing HTML event handler → `NotesController` → domain use case and validation → `FirestoreNotesRepository` → `FirestoreNotesDataSource` → Firestore. Results update the same note list/editor.
-- Authentication flows through `AuthController` → auth use case/repository → `FirebaseAuthDataSource` → Firebase Auth and profile document.
+```text
+konoha_nots/
+│
+├── public/
+│   ├── index.html
+│   │
+│   ├── assets/
+│   │   ├── css/
+│   │   │   └── app.css
+│   │   │
+│   │   ├── js/
+│   │   │   └── legacy-ui.js
+│   │   │
+│   │   └── images/
+│   │       └── ...
+│   │
+│   ├── firebase/
+│   │   ├── firebase-config.js
+│   │   └── firebase-config.example.js
+│   │
+│   └── src/
+│       ├── core/
+│       │   ├── config/
+│       │   ├── errors/
+│       │   ├── services/
+│       │   └── utils/
+│       │
+│       ├── features/
+│       │   ├── auth/
+│       │   │   ├── data/
+│       │   │   ├── domain/
+│       │   │   └── presentation/
+│       │   │
+│       │   ├── notes/
+│       │   │   ├── data/
+│       │   │   ├── domain/
+│       │   │   └── presentation/
+│       │   │
+│       │   └── profile/
+│       │       └── domain/
+│       │
+│       └── app/
+│           └── bootstrap/
+│
+├── documentation/
+│   ├── architecture.md
+│   ├── deployment.md
+│   ├── firebase.md
+│   ├── migration-audit.md
+│   ├── security.md
+│   └── screenshots/
+│
+├── tests/
+│   ├── unit/
+│   └── rules/
+│
+├── firestore.rules
+├── firestore.indexes.json
+├── firebase.json
+├── package.json
+└── README.md
+```
 
-## Authentication flow
+### Core Responsibilities
 
-Email/password registration creates a Firebase Auth user, reserves the lowercase username, writes the user's profile document, and sends the Firebase verification email. Login requires a verified email. Google uses Firebase Auth's popup provider and creates a profile/unique username reservation on first sign-in. The Auth state listener controls navigation and loads the user's notes. Password reset and verification resend use Firebase's built-in email actions. Firebase Auth's browser persistence is used; no application password/session storage is implemented.
+**Presentation**
 
-Full details and security rationale are in [architecture.md](documentation/architecture.md), [firebase.md](documentation/firebase.md), [security.md](documentation/security.md), and [deployment.md](documentation/deployment.md).
+Handles UI interaction, controllers, navigation, forms, and rendering.
 
-## Local development
+**Domain**
 
-1. Install Node.js 20 or later, Java JDK 11 or later, and the Firebase CLI (`npm install --global firebase-tools`). Install the project test dependencies with `npm install`.
-2. Create a Firebase project and Web App. Enable Email/Password and Google providers in Firebase Authentication.
-3. Use the existing public Web App configuration in `public/firebase/firebase-config.js`; verify provider settings and authorized domains in Firebase Console. Firebase Web config values are public identifiers; never put Admin SDK keys or service-account JSON here.
-4. For emulators, enable `KONOHA_USE_EMULATORS` in that file and set a local emulator-only Firebase config. Run `npm run emulators` in one terminal.
-5. Serve the project from its root with Firebase Hosting Emulator (`http://127.0.0.1:5000`) so module imports and Auth authorized-domain behavior are consistent.
-6. Run `npm test` for pure domain tests. Run `npm run test:rules` for Firestore Security Rules tests against the emulator.
+Contains business rules, entities, repository contracts, validation, filtering, sorting, and pure calculations.
 
-The Firebase CLI is installed separately because it is a developer/deployment tool, not an application dependency. Emulator setup requires Node.js 20+ and Java JDK 11+; emulator installation may download local binaries. See the official [Firebase Emulator setup guide](https://firebase.google.com/docs/emulator-suite/install_and_configure).
+**Data**
 
-## Hosting deployment
+Contains Firebase-specific implementations, Firestore access, authentication adapters, and data sources.
 
-Select the Firebase project with `firebase use --add`, enable providers, review rules, and deploy `firebase deploy --only firestore:rules,firestore:indexes,hosting`. The Hosting root is `public/`; PHP files, dotfiles, and private project folders are not deployed. Set authorized domains and test email verification/reset templates before launch. See [deployment.md](documentation/deployment.md).
+This separation keeps Firebase implementation details away from the core business logic.
 
-## Testing and QA
+---
 
-`npm test` currently covers note validation/mapping, search/filter/sort, and derived profile stats. The emulator rule suite covers owner CRUD, cross-user denial, unverified users, username reservations, unauthenticated reads, and invalid fields. It has not been run here because the Firebase CLI and Java are unavailable in this environment. Use the manual QA checklist in `documentation/deployment.md` for Google OAuth, email actions, responsive layout, and browser behavior.
+## 🔥 Firebase Architecture
 
-## Known limitations
+The application uses Firebase for authentication and private user data.
 
-- Firebase Web configuration targets `konoha-nots`; provider settings, authorized domains, browser E2E flows, deployed rules, and production deployment are not verified here.
-- Existing MySQL accounts/notes and any browser localStorage data have not been imported. Legacy password hashes cannot be reused as Firebase passwords; users must create Firebase accounts. Export and explicitly reassign existing note content before retiring the old database.
-- Search and filters load the signed-in user's notes and operate in memory, matching the existing behavior. This is not a paginated strategy for very large note collections.
-- The existing profile activity list is derived from note timestamps, not a separately stored audit/event history.
-- Note color remains `default`; there is no color UI, so no new design control was introduced.
-- Rich-text sanitization is client-side because there is no trusted PHP API after migration. Firestore rules also require bounded note fields; rules cannot replace thorough client-side sanitization.
-- No Firebase Storage or Cloud Functions are used because the app currently has no uploads or trusted server-only workflow.
-- PHP/MySQL files remain temporarily as rollback/reference code until Firebase emulator and project-backed browser verification succeeds. The active frontend no longer calls the PHP API.
+### Firebase Services
 
-## Screenshots
+* Firebase Authentication
+* Cloud Firestore
+* Firebase Hosting
+* Firebase Emulator Suite
+* Optional Firebase App Check
 
-Screenshots are not included yet. Add authentic desktop and mobile captures here after recording them from the running app.
+### Firestore Structure
 
-## Legacy backend status
+```text
+users/
+└── {uid}/
+    └── notes/
+        └── {noteId}
 
-The PHP/MySQL API and schema remain in the repository as rollback/reference material. The active browser frontend does not call the PHP API; `deployment.md` still documents that backend. Keep it until Firebase migration equivalence and data-retention decisions are confirmed.
+usernames/
+└── {lowercaseUsername}
+```
 
-## License
+### User Document
 
-No license file is currently present. For a public portfolio repository, consider MIT if you intend to allow reuse and modification; choose only after confirming rights to all included code and assets.
+```text
+users/{uid}
 
-## Future improvements
+uid
+displayName
+username
+email
+photoURL
+clan
+createdAt
+updatedAt
+```
 
-After Firebase project verification: enforce App Check after monitoring valid traffic, add pagination if real note volume requires it, and remove PHP/MySQL rollback files after an approved migration checkpoint. Avoid introducing a server-side layer unless a real trusted operation requires it.
+### Note Document
+
+```text
+users/{uid}/notes/{noteId}
+
+title
+content
+tags
+isPinned
+color
+createdAt
+updatedAt
+```
+
+Username reservations are stored separately using normalized lowercase usernames.
+
+---
+
+## 🔄 Application Data Flow
+
+### Authentication
+
+```text
+UI
+ ↓
+AuthController
+ ↓
+Auth Use Case
+ ↓
+Auth Repository
+ ↓
+Firebase Auth Data Source
+ ↓
+Firebase Authentication
+```
+
+The authentication layer also manages the user's Firebase profile document.
+
+### Notes
+
+```text
+HTML Event
+ ↓
+NotesController
+ ↓
+Note Use Case
+ ↓
+Notes Repository
+ ↓
+Firestore Notes Data Source
+ ↓
+Cloud Firestore
+```
+
+The result is returned to the controller and rendered through the existing application UI.
+
+---
+
+## 🔐 Security Model
+
+Firestore Security Rules enforce ownership and authentication requirements.
+
+The main security principles are:
+
+* Users can access only their own profile.
+* Users can access only their own notes.
+* Note operations require a verified email.
+* Users cannot change the UID associated with their profile.
+* Username claims are private.
+* A username cannot be claimed by multiple users.
+* Note creation timestamps cannot be manipulated after creation.
+* Invalid note fields are rejected by Firestore rules.
+* Unauthenticated users cannot access private data.
+* Cross-user profile and note access is denied.
+
+The active frontend does not use the legacy PHP API for note or authentication operations.
+
+Detailed security information is available in `documentation/security.md`.
+
+---
+
+## 🧪 Testing & QA
+
+The project has been locally tested across unit logic, Firestore Security Rules, JavaScript syntax, and browser behavior.
+
+### Test Results
+
+| Test                  | Result       |
+| --------------------- | ------------ |
+| Unit Tests            | ✅ 12/12 PASS |
+| Firestore Rules Tests | ✅ 7/7 PASS   |
+| JavaScript Syntax     | ✅ PASS       |
+| Git Diff Check        | ✅ PASS       |
+| Browser Smoke Test    | ✅ PASS       |
+
+### Unit Tests
+
+The unit test suite covers:
+
+* Note validation
+* Note mapping
+* Search
+* Filtering
+* Sorting
+* Profile statistics
+
+Run:
+
+```bash
+npm test
+```
+
+### Firestore Security Rules
+
+The emulator suite covers:
+
+* Owner note CRUD
+* Cross-user access denial
+* Unverified-user denial
+* Username reservations
+* Unauthenticated access denial
+* Invalid field rejection
+* UID immutability
+* Timestamp protection
+
+Run:
+
+```bash
+npm run test:rules
+```
+
+### Browser Verification
+
+The main browser flow was manually verified locally, including:
+
+* Guest navigation
+* Guest My Scroll access
+* Protected actions
+* Registration
+* Authentication
+* Notes creation
+* Notes editing
+* Notes deletion
+* Refresh persistence
+* My Scroll authenticated behavior
+* Profile
+* Settings
+* Logout
+* Private-route protection after logout
+
+---
+
+## 🚀 Local Development
+
+### Requirements
+
+* Node.js 20+
+* Java JDK 11+
+* Firebase CLI
+* npm
+
+Install project dependencies:
+
+```bash
+npm install
+```
+
+### Firebase Configuration
+
+Create/configure a Firebase Web App and enable:
+
+* Email/Password Authentication
+* Google Authentication
+
+The public Firebase Web configuration is stored in:
+
+```text
+public/firebase/firebase-config.js
+```
+
+Firebase Web configuration values are public identifiers. Never place Firebase Admin SDK credentials, service-account JSON, or other server secrets in the frontend.
+
+### Start Firebase Emulators
+
+```bash
+npm run emulators
+```
+
+The local Hosting emulator is used for browser testing so that JavaScript modules and Firebase emulator behavior work consistently.
+
+Default local services:
+
+```text
+Hosting:       http://127.0.0.1:5000
+Firestore:     http://127.0.0.1:8080
+Authentication: http://127.0.0.1:9099
+Emulator UI:   http://127.0.0.1:4000
+```
+
+### Run Tests
+
+```bash
+npm test
+```
+
+For Firestore Security Rules:
+
+```bash
+npm run test:rules
+```
+
+---
+
+## ☁️ Firebase Hosting Deployment
+
+The application is configured for Firebase Hosting with `public/` as the hosting root.
+
+Deployment command:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes,hosting
+```
+
+Before production deployment:
+
+1. Select the correct Firebase project.
+2. Verify Authentication providers.
+3. Verify authorized domains.
+4. Review Firestore Security Rules.
+5. Verify email verification and password reset templates.
+6. Test Google authentication.
+7. Test the complete production browser flow.
+8. Confirm the deployed application uses the intended Firebase project.
+
+> Production Firebase Hosting deployment has not yet been verified as part of the current QA cycle.
+
+---
+
+## 📁 Documentation
+
+Additional project documentation is available in:
+
+```text
+documentation/
+├── architecture.md
+├── deployment.md
+├── firebase.md
+├── migration-audit.md
+├── security.md
+└── screenshots/
+```
+
+These documents contain deeper information about architecture, Firebase configuration, migration status, security, deployment, and project screenshots.
+
+---
+
+## ⚠️ Known Limitations
+
+### Existing Data Migration
+
+Existing MySQL accounts, notes, and browser localStorage data have not been automatically migrated.
+
+Legacy password hashes cannot be reused as Firebase passwords. Existing users therefore require a Firebase account unless a dedicated migration strategy is implemented.
+
+### Note Scaling
+
+Search and filtering currently operate on the signed-in user's loaded notes in memory.
+
+This approach is suitable for the current application scope but is not a pagination strategy for very large note collections.
+
+### Profile Activity
+
+Profile activity is derived from note timestamps rather than a separately stored audit/event system.
+
+### Note Colors
+
+The note model supports the existing `color` field, but the current UI keeps the value as `default`. No additional color-selection interface was introduced.
+
+### Sanitization
+
+Rich-text content is sanitized on the client before storage.
+
+Firestore Security Rules additionally enforce field constraints, but rules are not a replacement for proper HTML sanitization.
+
+### Backend
+
+The original PHP/MySQL backend remains in the repository as rollback/reference material.
+
+The active Firebase frontend no longer calls the PHP API.
+
+### Firebase Storage / Cloud Functions
+
+Firebase Storage and Cloud Functions are not currently used because the application has no upload functionality or trusted server-only workflow.
+
+### Mobile Screenshots
+
+The current documentation contains desktop screenshots. Mobile-specific screenshots can be added later.
+
+---
+
+## 🗃️ Legacy Backend Status
+
+The original PHP/MySQL implementation remains temporarily available for rollback and reference.
+
+```text
+PHP/MySQL
+   ↓
+Legacy / Reference
+```
+
+The active application now follows:
+
+```text
+Browser
+   ↓
+Firebase Authentication
+   ↓
+Cloud Firestore
+```
+
+The legacy backend should only be removed after:
+
+* Firebase migration equivalence is confirmed.
+* Existing-data retention decisions are finalized.
+* Rollback is no longer required.
+* Production Firebase behavior is verified.
+
+---
+
+## 📌 Project Status
+
+| Area                     | Status                            |
+| ------------------------ | --------------------------------- |
+| UI / Visual Design       | ✅ Implemented                     |
+| Authentication           | ✅ Locally verified                |
+| Notes CRUD               | ✅ Locally verified                |
+| Profile                  | ✅ Locally verified                |
+| Settings                 | ✅ Locally verified                |
+| Firestore Security Rules | ✅ 7/7 tests passing               |
+| Domain Tests             | ✅ 12/12 passing                   |
+| Browser Smoke Test       | ✅ Verified                        |
+| Firebase Emulator        | ✅ Verified                        |
+| Firebase Hosting         | ⏳ Production verification pending |
+| Data Migration           | ⏳ Not implemented                 |
+| Mobile Documentation     | ⏳ Screenshots pending             |
+| Legacy Backend Removal   | ⏳ Pending migration checkpoint    |
+
+---
+
+## 🔮 Future Improvements
+
+* Verify and deploy Firebase Hosting to production.
+* Verify the complete production authentication and Firestore flow.
+* Monitor valid production traffic before enforcing Firebase App Check.
+* Add pagination if note volume requires it.
+* Implement a dedicated data migration strategy if existing MySQL data must be retained.
+* Add mobile screenshots to the documentation.
+* Remove PHP/MySQL rollback files after an approved migration checkpoint.
+* Introduce trusted server-side functionality only when an actual application requirement justifies it.
+
+---
+
+## 📄 License
+
+No license file is currently included.
+
+For a public portfolio repository, an MIT License can be considered if reuse and modification of the project are intended. Confirm rights to all included code, images, fonts, and other assets before adding a license.
+
+---
+
+## 👨‍💻 Author
+
+**Mohib Ullah Foysal**
+
+Computer Science & Technology Student
+App & Web Developer
+
+GitHub: [MUfoysal](https://github.com/MUfoysal)
