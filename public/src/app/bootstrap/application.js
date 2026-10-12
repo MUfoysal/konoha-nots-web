@@ -19,7 +19,10 @@ let notesController;
 let settingsController;
 let authState = 'loading';
 let lastUser = null;
-let saveQueue = Promise.resolve();
+const noteRevisions = new Map();
+const savedNoteRevisions = new Map();
+const noteSaveTasks = new Map();
+const pendingNoteSaves = new Set();
 let resendCooldownUntil = 0;
 let resendCooldownTimer = null;
 const RESEND_COOLDOWN_MS = 30_000;
@@ -145,6 +148,9 @@ function setAuthState(status, user = null) {
   if (resendHelp) resendHelp.style.display = status === 'unverified' ? '' : 'none';
   window.currentUser = status === 'authenticated' ? user : null;
   if (status !== 'authenticated' || userChanged) window.notes = [];
+  if (status !== 'authenticated' || userChanged) {
+    noteRevisions.clear(); savedNoteRevisions.clear(); pendingNoteSaves.clear();
+  }
   if (status !== 'authenticated') {
     window.activeNoteId = null;
     clearTimeout(window.autoSaveTimer);
@@ -182,16 +188,19 @@ function setAuthState(status, user = null) {
 async function loadNotes(uid = lastUser?.uid) {
   if (authState !== 'authenticated' || !uid) return;
   const list = byId('notesList');
-  if (list) list.innerHTML = '<div class="notes-empty-state"><div class="empty-icon">📜</div><p>Opening your scroll archive…</p></div>';
+  if (list) { list.innerHTML = `<div class="notes-empty-state"><div class="empty-icon">${window.shinobiIcon('scroll','ui-icon shinobi-icon empty-scroll-icon')}</div><p>Opening your scroll archive…</p></div>`; window.renderLucideIcons?.(list); }
   try {
     const notes = await notesController.load();
     if (authState !== 'authenticated' || lastUser?.uid !== uid) return;
-    window.notes = notes; window.renderNotesList?.(); refreshProfile();
+    window.notes = notes;
+    noteRevisions.clear(); savedNoteRevisions.clear(); pendingNoteSaves.clear();
+    notes.forEach(note => { noteRevisions.set(String(note.id), 0); savedNoteRevisions.set(String(note.id), 0); });
+    window.renderNotesList?.(); refreshProfile();
   }
   catch (error) {
     if (authState !== 'authenticated' || lastUser?.uid !== uid) return;
     notifyError('loading notes', error);
-    if (list) list.innerHTML = `<div class="notes-empty-state"><div class="empty-icon">📜</div><p>${userMessage(error)}</p></div>`;
+    if (list) { list.innerHTML = `<div class="notes-empty-state"><div class="empty-icon">${window.shinobiIcon('seal-warning','ui-icon shinobi-icon empty-scroll-icon')}</div><p>${userMessage(error)}</p></div>`; window.renderLucideIcons?.(list); }
   }
 }
 
@@ -248,7 +257,8 @@ window.doRegister = async () => {
 
 window.logout = async () => {
   try {
-    if (window.activeNoteId) { clearTimeout(window.autoSaveTimer); if (!await window.saveNote()) return false; }
+    clearTimeout(window.autoSaveTimer);
+    if (!await window.flushAllNoteSaves?.()) return false;
     await authController.logout(); window.showToast?.('Chakra sealed. Goodbye.', '');
     return true;
   }
@@ -267,32 +277,41 @@ window.createNote = async () => {
   } catch (error) { notifyError('create note', error); }
 };
 
-window.openNote = id => {
-  if (!requirePrivateAccess()) return;
-  const note = window.notes.find(item => String(item.id) === String(id)); if (!note) return;
+window.openNote = async id => {
+  if (!requirePrivateAccess()) return false;
+  const note = window.notes.find(item => String(item.id) === String(id)); if (!note) return false;
+  if (window.activeNoteId && String(window.activeNoteId) !== String(id)) {
+    clearTimeout(window.autoSaveTimer);
+    const saved = await window.saveNote({ manual: false });
+    if (!saved && !window.confirm('This scroll could not be sealed. Keep editing, or continue with the current changes still pending and retry later?')) return false;
+  }
   window.activeNoteId = id; window.isReadMode = false;
+  if (!noteRevisions.has(String(id))) { noteRevisions.set(String(id), 0); savedNoteRevisions.set(String(id), 0); }
   if (byId('editorEmpty')) byId('editorEmpty').style.display = 'none';
   const active = byId('editorActive'); if (active) { active.style.display = 'flex'; active.style.flexDirection = 'column'; active.style.height = '100%'; }
   if (byId('noteTitleInput')) byId('noteTitleInput').value = note.title;
   if (byId('note-content-editor')) byId('note-content-editor').innerHTML = sanitizeNoteHtml(note.content || '');
   window.renderTags?.(note.tags || []); window.updatePinBtn?.(note.pinned); window.updateReadBtn?.(); window.updateWordCount?.();
-  if (byId('lastSaved')) byId('lastSaved').textContent = `Sealed: ${new Date(note.updatedAt).toLocaleTimeString()}`;
+  const savedLabel = Number.isFinite(note.updatedAt) && note.updatedAt > 0 ? `Sealed: ${new Date(note.updatedAt).toLocaleTimeString()}` : 'Saved';
+  window.setNoteSaveStatus?.('saved', savedLabel);
   document.querySelectorAll('.note-item').forEach(element => element.classList.toggle('active', element.dataset.id === String(id)));
   byId('editorBodyDiv')?.classList.remove('read-mode'); if (byId('note-content-editor')) byId('note-content-editor').contentEditable = 'true';
   const formatBar = document.querySelector('.format-bar'); const tags = document.querySelector('.editor-tags');
   if (formatBar) formatBar.style.display = ''; if (tags) tags.style.display = '';
-  if (window.innerWidth <= 768) {
+  if (window.innerWidth <= 1023) {
     byId('notesEditor')?.classList.add('drawer-open');
     const sidebar = document.querySelector('.notes-sidebar');
     sidebar?.classList.remove('list-open');
     sidebar?.classList.add('drawer-hidden');
+    window.enterNotesEditorHistory?.(id);
   }
+  return true;
 };
 window.promptDelete = () => { if (!requirePrivateAccess()) return; deleteModalTrigger = document.activeElement; window.deleteTargetId = window.activeNoteId; byId('deleteModal')?.classList.add('open'); byId('deleteModal')?.querySelector('button')?.focus(); };
 window.deleteNoteById = (id, event) => { event?.stopPropagation(); if (!requirePrivateAccess()) return; deleteModalTrigger = event?.currentTarget || document.activeElement; window.deleteTargetId = id; byId('deleteModal')?.classList.add('open'); byId('deleteModal')?.querySelector('button')?.focus(); };
 window.closeDeleteModal = () => { byId('deleteModal')?.classList.remove('open'); window.deleteTargetId = null; deleteModalTrigger?.focus?.(); deleteModalTrigger = null; };
-window.updatePinBtn = pinned => { const button = byId('pinBtn'); if (button) { button.textContent = pinned ? '📌 Unpin' : '📌 Pin'; button.classList.toggle('active', pinned); } };
-window.updateReadBtn = () => { const button = byId('readBtn'); if (button) { button.textContent = window.isReadMode ? '✏️ Edit' : '👁 Read'; button.classList.toggle('active', !!window.isReadMode); } };
+window.updatePinBtn = pinned => { const button = byId('pinBtn'); if (button) { button.innerHTML = `${window.shinobiIcon(pinned ? 'seal-pin-open' : 'seal-pin')} <span>${pinned ? 'Unpin' : 'Pin'}</span>`; button.classList.toggle('active', pinned); } };
+window.updateReadBtn = () => { const button = byId('readBtn'); if (button) { const readMode = !!window.isReadMode; button.innerHTML = `${readMode ? window.shinobiIcon('kunai-edit') : '<i class="ui-icon" data-lucide="eye" aria-hidden="true" width="14" height="14"></i>'} <span>${readMode ? 'Edit' : 'Read'}</span>`; button.classList.toggle('active', readMode); window.renderLucideIcons?.(button); } };
 window.toggleReadMode = () => {
   window.isReadMode = !window.isReadMode;
   byId('editorBodyDiv')?.classList.toggle('read-mode', window.isReadMode);
@@ -302,55 +321,142 @@ window.toggleReadMode = () => {
   if (window.isReadMode) void window.saveNote(); window.updateReadBtn();
 };
 
-function persistNote(note) {
-  const payload = normalizeNote(note);
-  saveQueue = saveQueue.catch(() => {}).then(async () => {
-    const saved = await notesController.update(note.id, payload);
-    storeNote(saved);
-    return saved;
-  });
-  return saveQueue;
+function setNoteSaveStatus(state, message) {
+  const status = byId('lastSaved');
+  if (status) { status.textContent = message; status.dataset.state = state; }
+  const retry = byId('retrySaveBtn');
+  if (retry) retry.hidden = state !== 'failed';
 }
-window.saveNote = async () => {
-  if (!requirePrivateAccess()) return false;
-  const id = window.activeNoteId;
-  const note = window.notes.find(item => String(item.id) === String(id));
-  if (!note) return true;
-  note.title = byId('noteTitleInput')?.value || note.title || 'Untitled';
-  note.content = sanitizeNoteHtml(byId('note-content-editor')?.innerHTML ?? note.content ?? '');
-  try {
-    if (byId('lastSaved')) byId('lastSaved').textContent = 'Sealing…';
-    const saved = await persistNote(note);
-    if (byId('lastSaved')) byId('lastSaved').textContent = `Sealed: ${new Date(saved.updatedAt).toLocaleTimeString()}`;
-    window.showToast?.('Scroll sealed!', 'success');
-    return true;
-  } catch (error) { notifyError('save note', error); return false; }
+window.setNoteSaveStatus = setNoteSaveStatus;
+window.isNotePendingSave = id => pendingNoteSaves.has(String(id));
+window.hasPendingNoteSaves = () => pendingNoteSaves.size > 0;
+window.retryNoteSave = async (id, event) => {
+  event?.stopPropagation();
+  const saved = await flushNoteSave(id);
+  if (saved) window.showToast?.('Scroll sealed!', 'success');
+  return saved;
 };
-window.updateNoteTitle = () => {
+window.addEventListener('beforeunload', event => {
+  if (!pendingNoteSaves.size) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
+
+
+function markNoteDirty(note) {
+  const id = String(note.id);
+  noteRevisions.set(id, (noteRevisions.get(id) || 0) + 1);
+  pendingNoteSaves.add(id);
+  if (String(window.activeNoteId) === id) setNoteSaveStatus('unsaved', 'Unsaved changes');
+  window.renderNotesList?.();
+}
+
+function updateActiveNoteFromEditor() {
   const note = window.notes.find(item => String(item.id) === String(window.activeNoteId));
-  if (!note) return;
+  if (!note) return null;
+  const previousTitle = note.title;
+  const previousContent = note.content;
   note.title = byId('noteTitleInput')?.value || 'Untitled';
+  note.content = sanitizeNoteHtml(byId('note-content-editor')?.innerHTML ?? note.content ?? '');
+  return { note, changed: previousTitle !== note.title || previousContent !== note.content };
+}
+
+function flushNoteSave(id) {
+  id = String(id);
+  const currentTask = noteSaveTasks.get(id);
+  if (currentTask) return currentTask.then(() => flushNoteSave(id));
+  const task = (async () => {
+    while ((savedNoteRevisions.get(id) || 0) < (noteRevisions.get(id) || 0)) {
+      if (authState !== 'authenticated' || !lastUser?.uid) return false;
+      const note = window.notes.find(item => String(item.id) === id);
+      if (!note) return false;
+      const revision = noteRevisions.get(id) || 0;
+      const uid = lastUser.uid;
+      if (String(window.activeNoteId) === id) setNoteSaveStatus('saving', 'Sealing…');
+      try {
+        const snapshot = normalizeNote({ ...note, tags: [...(note.tags || [])] });
+        const saved = await notesController.update(id, snapshot);
+        if (lastUser?.uid !== uid || authState !== 'authenticated') return false;
+        savedNoteRevisions.set(id, revision);
+        if ((noteRevisions.get(id) || 0) === revision) pendingNoteSaves.delete(id);
+        const latest = window.notes.find(item => String(item.id) === id);
+        if (latest) latest.updatedAt = saved.updatedAt;
+        window.renderNotesList?.();
+        refreshProfile();
+        if (String(window.activeNoteId) === id && (noteRevisions.get(id) || 0) === revision) {
+          setNoteSaveStatus('saved', `Sealed: ${new Date(saved.updatedAt).toLocaleTimeString()}`);
+        }
+      } catch (error) {
+        if (String(window.activeNoteId) === id) setNoteSaveStatus('failed', 'Seal failed — your changes remain here');
+        reportError('save note', error);
+        window.showToast?.('Could not seal this scroll. Your changes are still in the editor; retry when ready.', 'error');
+        return false;
+      }
+    }
+    return true;
+  })();
+  noteSaveTasks.set(id, task);
+  return task.finally(() => { if (noteSaveTasks.get(id) === task) noteSaveTasks.delete(id); });
+}
+
+window.saveNote = async (options = {}) => {
+  if (!requirePrivateAccess()) return false;
   clearTimeout(window.autoSaveTimer);
-  window.autoSaveTimer = setTimeout(() => void window.saveNote(), 1200);
+  const id = String(window.activeNoteId || '');
+  const snapshot = updateActiveNoteFromEditor();
+  if (!snapshot) return true;
+  if (snapshot.changed && (savedNoteRevisions.get(id) || 0) >= (noteRevisions.get(id) || 0)) markNoteDirty(snapshot.note);
+  if (!pendingNoteSaves.has(id) && !noteSaveTasks.has(id)) {
+    if (options.manual) window.showToast?.('This scroll is already sealed.', 'success');
+    return true;
+  }
+  const saved = await flushNoteSave(id);
+  if (saved && options.manual) window.showToast?.('Scroll sealed!', 'success');
+  return saved;
 };
-window.onContentChange = () => { window.updateWordCount?.(); clearTimeout(window.autoSaveTimer); window.autoSaveTimer = setTimeout(() => void window.saveNote(), 1200); };
-window.togglePin = async () => { const note = window.notes.find(item => String(item.id) === String(window.activeNoteId)); if (!note) return; note.pinned = !note.pinned; await window.saveNote(); window.updatePinBtn?.(note.pinned); };
+
+window.flushAllNoteSaves = async () => {
+  if (window.activeNoteId) {
+    const active = updateActiveNoteFromEditor();
+    if (active?.changed && (savedNoteRevisions.get(String(active.note.id)) || 0) >= (noteRevisions.get(String(active.note.id)) || 0)) markNoteDirty(active.note);
+  }
+  clearTimeout(window.autoSaveTimer);
+  const ids = [...pendingNoteSaves];
+  for (const id of ids) if (!await flushNoteSave(id)) return false;
+  return true;
+};
+
+function scheduleActiveNoteSave() {
+  const note = updateActiveNoteFromEditor();
+  if (!note) return;
+  markNoteDirty(note);
+  clearTimeout(window.autoSaveTimer);
+  window.autoSaveTimer = setTimeout(() => void window.saveNote({ manual: false }), 1000);
+}
+
+window.updateNoteTitle = () => scheduleActiveNoteSave();
+window.onContentChange = () => { window.updateWordCount?.(); scheduleActiveNoteSave(); };
+window.togglePin = async () => {
+  const note = window.notes.find(item => String(item.id) === String(window.activeNoteId)); if (!note) return;
+  note.pinned = !note.pinned; markNoteDirty(note); window.updatePinBtn?.(note.pinned);
+  await flushNoteSave(note.id);
+};
 window.pinNoteById = async (id, event) => {
   event?.stopPropagation();
-  const note = window.notes.find(item => String(item.id) === String(id));
-  if (!note) return;
-  note.pinned = !note.pinned;
-  try { storeNote(await persistNote(note)); }
-  catch (error) { note.pinned = !note.pinned; notifyError('pin note', error); window.renderNotesList?.(); }
+  const note = window.notes.find(item => String(item.id) === String(id)); if (!note) return;
+  note.pinned = !note.pinned; markNoteDirty(note);
+  await flushNoteSave(id);
 };
 window.confirmDelete = async () => {
   if (!requirePrivateAccess()) return;
   if (!window.deleteTargetId) return;
-  const id = window.deleteTargetId;
+  const id = String(window.deleteTargetId);
   try {
-    await saveQueue.catch(() => {});
-    await notesController.remove(id); window.notes = window.notes.filter(note => String(note.id) !== String(id));
-    if (String(window.activeNoteId) === String(id)) { window.activeNoteId = null; if (byId('editorEmpty')) byId('editorEmpty').style.display = 'flex'; if (byId('editorActive')) byId('editorActive').style.display = 'none'; }
+    if (pendingNoteSaves.has(id) && !await flushNoteSave(id)) return;
+    await notesController.remove(id); window.notes = window.notes.filter(note => String(note.id) !== id);
+    noteRevisions.delete(id); savedNoteRevisions.delete(id); pendingNoteSaves.delete(id);
+    if (String(window.activeNoteId) === id) { window.activeNoteId = null; if (byId('editorEmpty')) byId('editorEmpty').style.display = 'flex'; if (byId('editorActive')) byId('editorActive').style.display = 'none'; }
     window.closeDeleteModal?.(); window.renderNotesList?.(); refreshProfile(); window.showToast?.('Scroll destroyed', 'success');
   } catch (error) { notifyError('delete note', error); }
 };
@@ -358,10 +464,16 @@ window.handleTagInput = event => {
   if (!['Enter', ','].includes(event.key)) return;
   event.preventDefault(); const note = window.notes.find(item => String(item.id) === String(window.activeNoteId));
   const value = event.target.value.trim().replace(',', '');
-  if (value && note && !note.tags.includes(value)) { note.tags.push(value); window.renderTags?.(note.tags); void window.saveNote(); }
+  if (value && note && !note.tags.includes(value) && note.tags.length < 20 && value.length <= 40) {
+    note.tags.push(value); window.renderTags?.(note.tags); markNoteDirty(note); clearTimeout(window.autoSaveTimer); window.autoSaveTimer = setTimeout(() => void window.saveNote({ manual: false }), 1000);
+  }
   event.target.value = '';
 };
-window.removeTag = index => { const note = window.notes.find(item => String(item.id) === String(window.activeNoteId)); if (!note) return; note.tags.splice(index, 1); window.renderTags?.(note.tags); void window.saveNote(); };
+window.removeTag = index => {
+  const note = window.notes.find(item => String(item.id) === String(window.activeNoteId)); if (!note) return;
+  note.tags.splice(index, 1); window.renderTags?.(note.tags); markNoteDirty(note);
+  clearTimeout(window.autoSaveTimer); window.autoSaveTimer = setTimeout(() => void window.saveNote({ manual: false }), 1000);
+};
 
 function setSettingsFeedback(id, message, type = '') {
   const element = byId(id);

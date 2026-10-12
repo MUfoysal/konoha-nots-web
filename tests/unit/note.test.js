@@ -24,6 +24,12 @@ test('Firestore timestamps map to the legacy UI millisecond model', () => {
   assert.equal(note.updatedAt, 20);
 });
 
+test('missing Firestore timestamps remain unavailable instead of being invented', () => {
+  const note = noteFromDocument('id-2', { title: 'N', content: '', tags: [], isPinned: false });
+  assert.equal(note.createdAt, null);
+  assert.equal(note.updatedAt, null);
+});
+
 test('profile ranks and statistics are derived from the signed-in user notes', () => {
   const stats = calculateProfileStatistics([
     { title: 'one', content: '<p>two words</p>', pinned: true, tags: ['writing'], createdAt: 95, updatedAt: 100 },

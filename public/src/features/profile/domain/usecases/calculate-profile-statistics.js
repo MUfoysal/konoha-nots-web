@@ -16,7 +16,7 @@ export function calculateProfileStatistics(notes, now = Date.now()) {
   const rankProgress = nextThreshold ? Math.round(((noteCount - thresholds[rankIndex]) / (nextThreshold - thresholds[rankIndex])) * 100) : 100;
   return {
     noteCount, pinnedCount, totalWords, tags, lastNote, rankIndex, rank: rankNames[rankIndex],
-    rankIcon: ['🎓', '🥷', '⚡', '🔥', '🎭', '👑'][rankIndex], rankProgress, rankOrder,
+    rankIcon: ['graduation-cap', 'shield', 'zap', 'flame', 'venetian-mask', 'crown'][rankIndex], rankProgress, rankOrder,
     nextRank: rankOrder[rankIndex + 1] || null,
     notesThisWeek: notes.filter(note => note.createdAt > now - 7 * 24 * 60 * 60 * 1000).length,
   };

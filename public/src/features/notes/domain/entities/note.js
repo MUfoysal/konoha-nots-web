@@ -11,5 +11,5 @@ export function validateNote(input) {
 }
 
 export function noteFromDocument(id, data) {
-  return { id, title: data.title, content: data.content, tags: data.tags || [], pinned: !!data.isPinned, color: data.color || 'default', createdAt: data.createdAt?.toMillis?.() ?? Date.now(), updatedAt: data.updatedAt?.toMillis?.() ?? Date.now() };
+  return { id, title: data.title, content: data.content, tags: data.tags || [], pinned: !!data.isPinned, color: data.color || 'default', createdAt: data.createdAt?.toMillis?.() ?? null, updatedAt: data.updatedAt?.toMillis?.() ?? null };
 }

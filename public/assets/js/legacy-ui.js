@@ -1,15 +1,186 @@
 
+// ==================== SHINOBI + UTILITY ICONS ====================
+const SHINOBI_ICON_NAMES = new Set([
+  'scroll','scroll-add','archive-scroll','tag-seal','seal-pin','seal-pin-open','chakra','chakra-focus',
+  'shuriken','ninja','leaf-mark','spiral-seal','seal-lock','scroll-save','kunai-edit','seal-settings',
+  'clan-mark','rank-seal','flame-seal','story-seal','seal-check','seal-warning','search-scroll'
+]);
+window.shinobiIcon = (name, className = 'ui-icon shinobi-icon') => {
+  if (!SHINOBI_ICON_NAMES.has(name)) throw new Error(`Unknown Shinobi icon: ${name}`);
+  return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#${name}"></use></svg>`;
+};
+let shinobiSpritePromise;
+function loadShinobiSprite(){
+  if(document.getElementById('shinobi-icon-sprite'))return Promise.resolve();
+  if(shinobiSpritePromise)return shinobiSpritePromise;
+  const spriteUrl=new URL('assets/images/icons/shinobi.svg',document.baseURI);
+  shinobiSpritePromise=fetch(spriteUrl).then(response=>{
+    if(!response.ok)throw new Error(`Icon sprite request failed (${response.status})`);
+    return response.text();
+  }).then(markup=>{
+    const parsed=new DOMParser().parseFromString(markup,'image/svg+xml');
+    const source=parsed.documentElement;
+    if(source.localName!=='svg'||parsed.querySelector('parsererror'))throw new Error('Invalid Shinobi SVG sprite');
+    const sprite=document.importNode(source,true);
+    sprite.id='shinobi-icon-sprite';sprite.setAttribute('aria-hidden','true');sprite.setAttribute('focusable','false');
+    sprite.style.cssText='position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
+    document.body.prepend(sprite);
+  }).catch(error=>{console.error('Could not load the Shinobi icon sprite:',error);shinobiSpritePromise=null;});
+  return shinobiSpritePromise;
+};
+window.renderLucideIcons = root => {
+  void loadShinobiSprite();
+  const scope = root || document;
+  scope.querySelectorAll?.('[data-shinobi-icon]').forEach(placeholder => {
+    const name = placeholder.dataset.shinobiIcon;
+    if (!SHINOBI_ICON_NAMES.has(name)) return;
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('class', placeholder.className || 'ui-icon shinobi-icon');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.setAttribute('focusable', 'false');
+    ['width','height'].forEach(attribute => { if (placeholder.hasAttribute(attribute)) icon.setAttribute(attribute, placeholder.getAttribute(attribute)); });
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#${name}`);
+    icon.append(use);
+    placeholder.replaceWith(icon);
+  });
+  if (window.lucide?.createIcons) window.lucide.createIcons({ root: scope });
+};
+window.renderLucideIcons();
+
 // ==================== STATE ====================
 var currentUser=null,notes=[],activeNoteId=null,activeFilter='all',deleteTargetId=null,isReadMode=false,autoSaveTimer=null;
+let notesLeaveGuardActive=false,notesLeaveGuardBypass=false;
 let _authAnimActive=false,_authRaf=null;
+let navScrollFrame=0,notesAppBarTimer=null,notesAppBarEnabled=false;
+
+function updateActiveNavigation(){
+  const navItems=document.querySelectorAll('#nav [data-nav-view],#nav [data-nav-section],#mobileMenu [data-nav-view],#mobileMenu [data-nav-section]');
+  navItems.forEach(item=>{item.classList.remove('is-active');item.removeAttribute('aria-current')});
+  const activeView=document.querySelector('.view.active')?.id.replace(/^view-/,'');
+  let activeSection='';
+  if(activeView==='home'){
+    const nav=document.getElementById('nav');
+    const threshold=(nav?.offsetHeight||0)+24;
+    const sections=[...document.querySelectorAll('#view-home [id]')].filter(section=>
+      [...document.querySelectorAll('[data-nav-section]')].some(item=>item.dataset.navSection===section.id)
+    );
+    activeSection=sections.filter(section=>{
+      const rect=section.getBoundingClientRect();
+      return rect.top<=threshold&&rect.bottom>threshold;
+    }).at(-1)?.id||(
+      window.scrollY+window.innerHeight>=document.documentElement.scrollHeight-2?sections.at(-1)?.id||'':''
+    );
+  }
+  const authMode=document.getElementById('view-auth')?.dataset.authMode;
+  navItems.forEach(item=>{
+    const matchesView=item.dataset.navView===activeView&&(!item.dataset.navMode||item.dataset.navMode===authMode);
+    const matchesSection=activeView==='home'&&item.dataset.navSection===activeSection;
+    if(matchesView||matchesSection){item.classList.add('is-active');item.setAttribute('aria-current',matchesView?'page':'location')}
+  });
+}
+
+function handleAppBarScroll(){
+  if(navScrollFrame)return;
+  navScrollFrame=window.requestAnimationFrame(()=>{
+    navScrollFrame=0;
+    const nav=document.getElementById('nav');
+    if(!nav)return;
+    const currentY=Math.max(0,window.scrollY);
+    nav.classList.toggle('scrolled',currentY>8);
+    updateActiveNavigation();
+  });
+}
+
+function isNotesDesktopView(){
+  return document.getElementById('view-notes')?.classList.contains('active')&&window.matchMedia('(min-width: 1024px)').matches;
+}
+
+function setNotesAppBarHidden(hidden){
+  const nav=document.getElementById('nav');
+  const notesView=document.getElementById('view-notes');
+  if(!nav||!notesView)return;
+  nav.classList.toggle('nav-hidden',hidden);
+  notesView.classList.toggle('notes-space-expanded',hidden);
+}
+
+function clearNotesAppBarTimer(){
+  if(notesAppBarTimer){window.clearTimeout(notesAppBarTimer);notesAppBarTimer=null}
+}
+
+function scheduleNotesAppBarHide(){
+  clearNotesAppBarTimer();
+  if(!notesAppBarEnabled)return;
+  const nav=document.getElementById('nav');
+  if(nav?.matches(':hover')||nav?.contains(document.activeElement))return;
+  notesAppBarTimer=window.setTimeout(()=>{
+    notesAppBarTimer=null;
+    if(notesAppBarEnabled&&!nav?.matches(':hover')&&!nav?.contains(document.activeElement))setNotesAppBarHidden(true);
+  },3500);
+}
+
+function handleNotesPageActivity(){
+  if(!notesAppBarEnabled)return;
+  setNotesAppBarHidden(false);
+  scheduleNotesAppBarHide();
+}
+
+function handleNotesNavEnter(){clearNotesAppBarTimer();setNotesAppBarHidden(false)}
+function handleNotesNavLeave(){scheduleNotesAppBarHide()}
+function handleNotesNavFocusOut(event){if(!event.relatedTarget||!event.currentTarget.contains(event.relatedTarget))scheduleNotesAppBarHide()}
+
+function cleanupNotesAppBarBehavior(){
+  clearNotesAppBarTimer();
+  if(!notesAppBarEnabled)return;
+  const nav=document.getElementById('nav');
+  window.removeEventListener('mousemove',handleNotesPageActivity);
+  window.removeEventListener('pointerdown',handleNotesPageActivity);
+  window.removeEventListener('keydown',handleNotesPageActivity);
+  window.removeEventListener('wheel',handleNotesPageActivity);
+  nav?.removeEventListener('mouseenter',handleNotesNavEnter);
+  nav?.removeEventListener('mouseleave',handleNotesNavLeave);
+  nav?.removeEventListener('focusin',handleNotesNavEnter);
+  nav?.removeEventListener('focusout',handleNotesNavFocusOut);
+  nav?.classList.remove('notes-auto-hide');
+  document.getElementById('view-notes')?.classList.remove('notes-space-expanded');
+  notesAppBarEnabled=false;
+}
+
+function syncNotesAppBarBehavior(){
+  const nav=document.getElementById('nav');
+  if(!nav)return;
+  if(!isNotesDesktopView()){
+    cleanupNotesAppBarBehavior();
+    nav.classList.remove('nav-hidden');
+    return;
+  }
+  if(notesAppBarEnabled)return;
+  notesAppBarEnabled=true;
+  nav.classList.add('notes-auto-hide');
+  setNotesAppBarHidden(false);
+  window.addEventListener('mousemove',handleNotesPageActivity,{passive:true});
+  window.addEventListener('pointerdown',handleNotesPageActivity,{passive:true});
+  window.addEventListener('keydown',handleNotesPageActivity);
+  window.addEventListener('wheel',handleNotesPageActivity,{passive:true});
+  nav.addEventListener('mouseenter',handleNotesNavEnter);
+  nav.addEventListener('mouseleave',handleNotesNavLeave);
+  nav.addEventListener('focusin',handleNotesNavEnter);
+  nav.addEventListener('focusout',handleNotesNavFocusOut);
+  scheduleNotesAppBarHide();
+}
+
+window.addEventListener('scroll',handleAppBarScroll,{passive:true});
+window.addEventListener('resize',()=>{updateActiveNavigation();syncNotesAppBarBehavior()},{passive:true});
+document.addEventListener('DOMContentLoaded',()=>{updateActiveNavigation();syncNotesAppBarBehavior()},{once:true});
 
 // Clean up mobile drawer classes when resizing to desktop
 window.addEventListener('resize',()=>{
-  if(window.innerWidth>768){
+  if(window.innerWidth>1023){
     const ne=document.getElementById('notesEditor');
     const ns=document.querySelector('.notes-sidebar');
     if(ne)ne.classList.remove('drawer-open');
-    if(ns)ns.classList.remove('drawer-hidden');
+    if(ns)ns.classList.remove('drawer-hidden','list-open');
   }
 });
 
@@ -114,6 +285,17 @@ function scrollToSection(id){navToHome(id)}
 
 // ==================== VIEW ROUTING ====================
 function showView(name,sub){
+  if(name!=='notes'&&!notesLeaveGuardBypass&&document.getElementById('view-notes')?.classList.contains('active')&&window.hasPendingNoteSaves?.()){
+    if(notesLeaveGuardActive)return;
+    notesLeaveGuardActive=true;
+    void (async()=>{
+      const saved=await window.flushAllNoteSaves?.();
+      if(saved===false&&!window.confirm('This scroll could not be sealed. Stay here, or continue leaving with changes still pending so you can retry later?')){notesLeaveGuardActive=false;return}
+      notesLeaveGuardBypass=true;
+      try{showView(name,sub)}finally{notesLeaveGuardBypass=false;notesLeaveGuardActive=false}
+    })();
+    return;
+  }
   const authStatus=window.getKonohaAuthState?.();
   if(name==='auth'&&authStatus==='authenticated'){
     showView('notes');return
@@ -136,6 +318,7 @@ function showView(name,sub){
   
 
   const t=document.getElementById('pageTransition');
+  if(name==='auth')document.getElementById('view-auth').dataset.authMode=sub||'login';
   t.classList.add('enter');
   setTimeout(()=>{
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -164,6 +347,8 @@ function showView(name,sub){
     }
     if(name==='settings')window.loadSettingsPage?.();
     if(name==='home'){initHeroCanvas();initScrollObserver()}
+    updateActiveNavigation();
+    syncNotesAppBarBehavior();
 
     t.classList.remove('enter');t.classList.add('exit');
     setTimeout(()=>t.classList.remove('exit'),500);
@@ -174,55 +359,151 @@ function showView(name,sub){
 // ==================== RENDER ====================
 function renderNotesList(){
   const list=document.getElementById('notesList');
-  const search=(document.getElementById('notesSearch').value||'').toLowerCase();
-  const filtered=window.filterAndSortNotes(notes,{search,filter:activeFilter});
+  if(!list)return;
+  const all=window.notes||notes;
+  const search=(document.getElementById('notesSearch')?.value||'').trim();
+  const filtered=window.filterAndSortNotes(all,{search,filter:activeFilter});
+  const recent=window.filterAndSortNotes(all,{filter:'recent'}).length;
+  const pinned=all.filter(note=>note.pinned).length;
   document.getElementById('noteCount').textContent=filtered.length;
+  [['allNoteCount',all.length],['pinnedNoteCount',pinned],['recentNoteCount',recent]].forEach(([id,count])=>{const node=document.getElementById(id);if(node)node.textContent=count});
+  list.replaceChildren();
   if(filtered.length===0){
-    const emptyMessage=notes.length===0
-      ? (window.getKonohaAuthState?.()==='authenticated'?'No scrolls yet.<br>Create your first one below.':'Sign in or register to access your private scrolls.')
-      : 'No scrolls match your search.';
-    list.innerHTML=`<div class="notes-empty-state"><div class="empty-icon">📜</div><p>${emptyMessage}</p></div>`;
-    return;
+    const empty=document.createElement('div');empty.className='notes-empty-state';
+    const icon=document.createElement('div');icon.className='empty-icon';icon.innerHTML=window.shinobiIcon('scroll','ui-icon shinobi-icon empty-scroll-icon');empty.append(icon);
+    const message=document.createElement('p');
+    message.textContent=search?'No scrolls match your search.':activeFilter==='pinned'?'No sealed scrolls yet.':all.length===0
+      ? (window.getKonohaAuthState?.()==='authenticated'?'Your archive is empty. Create your first scroll below.':'Sign in or register to access your private scrolls.')
+      :'No recent scrolls yet.';
+    empty.append(message);list.append(empty);window.renderLucideIcons?.(list);return;
   }
-  list.innerHTML=filtered.map(note=>{
-    const preview=note.content?note.content.replace(/<[^>]*>/g,'').slice(0,60)+'...':'Empty scroll…';
-    const date=new Date(note.updatedAt).toLocaleDateString('en',{month:'short',day:'numeric'});
-    return`<div class="note-item${note.id===activeNoteId?' active':''}" data-id="${note.id}" onclick="openNote('${note.id}')">
-      <div class="note-item-title">${escapeHtml(note.title)}</div>
-      <div class="note-item-preview">${escapeHtml(preview)}</div>
-      <div class="note-item-meta"><span class="note-item-date">${date}</span><div class="note-item-badges">${note.pinned?'<span class="badge badge-pin">📌</span>':''}${(note.tags||[]).length?'<span class="badge badge-sealed">🏷 '+(note.tags||[]).length+'</span>':''}</div></div>
-      <div class="note-item-actions"><button class="icon-btn ${note.pinned?'pin-active':''}" aria-label="${note.pinned?'Unpin':'Pin'} scroll" onclick="pinNoteById('${note.id}',event)">📌</button><button class="icon-btn delete" aria-label="Delete scroll" onclick="deleteNoteById('${note.id}',event)">🔥</button></div>
-    </div>`;
-  }).join('');
+  const sections=[];
+  const pinnedNotes=filtered.filter(note=>note.pinned);
+  if(pinnedNotes.length)sections.push(['Pinned',pinnedNotes]);
+  const unpinned=filtered.filter(note=>!note.pinned);
+  const now=new Date();const startToday=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  const startYesterday=startToday-86400000;const startWeek=startToday-6*86400000;
+  const buckets=[['Today',[]],['Yesterday',[]],['This week',[]],['Earlier',[]]];
+  unpinned.forEach(note=>{
+    const updated=Number(note.updatedAt);const time=Number.isFinite(updated)&&updated>0?updated:null;
+    const bucket=!time?3:time>=startToday?0:time>=startYesterday?1:time>=startWeek?2:3;
+    buckets[bucket][1].push(note);
+  });
+  sections.push(...buckets.filter(([,items])=>items.length));
+  for(const [label,items] of sections){
+    const heading=document.createElement('h3');heading.className='notes-group-heading';heading.textContent=label;list.append(heading);
+    for(const note of items)list.append(createNoteListItem(note));
+  }
+  window.renderLucideIcons?.(list);
+}
+
+function createNoteListItem(note){
+  const article=document.createElement('article');article.className='note-item'+(String(note.id)===String(activeNoteId)?' active':'');article.dataset.id=String(note.id);
+  const open=document.createElement('button');open.type='button';open.className='note-item-open';open.setAttribute('aria-label',`Open ${note.title||'Untitled scroll'}`);open.addEventListener('click',()=>void window.openNote?.(note.id));
+  const title=document.createElement('span');title.className='note-item-title';title.textContent=note.title||'Untitled';open.append(title);
+  const noteText=plainTextContent(note.content);
+  const preview=document.createElement('span');preview.className='note-item-preview';preview.textContent=noteText.replace(/\s+/g,' ').trim().slice(0,120)||'Unroll this scroll to begin…';open.append(preview);
+  const meta=document.createElement('span');meta.className='note-item-meta';
+  const date=document.createElement('time');date.className='note-item-date';const stamp=Number(note.updatedAt);
+  if(Number.isFinite(stamp)&&stamp>0){date.dateTime=new Date(stamp).toISOString();date.textContent=relativeNoteDate(stamp)}else date.textContent='Date unavailable';
+  meta.append(date);
+  const wordCount=document.createElement('span');wordCount.className='note-item-word-count';wordCount.textContent=`${noteText.trim().split(/\s+/).filter(Boolean).length} words`;meta.append(wordCount);open.append(meta);article.append(open);
+  const indicators=document.createElement('div');indicators.className='note-item-indicators';
+  if(note.pinned){const seal=document.createElement('span');seal.className='badge badge-pin';seal.innerHTML=window.shinobiIcon('seal-pin')+' Pinned';indicators.append(seal)}
+  if(window.isNotePendingSave?.(note.id)){const pending=document.createElement('span');pending.className='badge badge-unsaved';pending.textContent='Unsaved';pending.setAttribute('aria-label','Changes are waiting to be saved');indicators.append(pending)}
+  (note.tags||[]).slice(0,2).forEach(tag=>{const chip=document.createElement('span');chip.className='badge badge-sealed';chip.textContent=tag;indicators.append(chip)});
+  if((note.tags||[]).length>2){const more=document.createElement('span');more.className='badge badge-sealed';more.textContent=`+${note.tags.length-2}`;indicators.append(more)}
+  if(indicators.childElementCount)article.append(indicators);
+  const actions=document.createElement('div');actions.className='note-item-actions';
+  const pin=document.createElement('button');pin.type='button';pin.className=`icon-btn${note.pinned?' pin-active':''}`;pin.setAttribute('aria-label',note.pinned?'Unpin scroll':'Pin scroll');pin.setAttribute('aria-pressed',String(Boolean(note.pinned)));pin.innerHTML=window.shinobiIcon(note.pinned?'seal-pin-open':'seal-pin');pin.addEventListener('click',event=>void window.pinNoteById?.(note.id,event));actions.append(pin);
+  if(window.isNotePendingSave?.(note.id)){
+    const retry=document.createElement('button');retry.type='button';retry.className='note-retry-btn';retry.innerHTML='<i class="ui-icon" data-lucide="refresh-cw" aria-hidden="true"></i> Retry save';retry.addEventListener('click',event=>void window.retryNoteSave?.(note.id,event));actions.append(retry);
+  }
+  const remove=document.createElement('button');remove.type='button';remove.className='icon-btn delete';remove.setAttribute('aria-label','Delete scroll');remove.innerHTML='<i class="ui-icon" data-lucide="trash-2" aria-hidden="true"></i>';remove.addEventListener('click',event=>window.deleteNoteById?.(note.id,event));actions.append(remove);article.append(actions);
+  return article;
+}
+
+function plainTextContent(content){
+  const parsed=new DOMParser().parseFromString(String(content||''),'text/html');
+  return parsed.body.textContent||'';
+}
+function relativeNoteDate(timestamp){
+  const date=new Date(timestamp);const today=new Date();const dayStart=new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime();
+  const thenStart=new Date(date.getFullYear(),date.getMonth(),date.getDate()).getTime();
+  if(thenStart===dayStart)return `Today · ${date.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`;
+  if(thenStart===dayStart-86400000)return 'Yesterday';
+  return date.toLocaleDateString([],{month:'short',day:'numeric',year:date.getFullYear()===today.getFullYear()?undefined:'numeric'});
 }
 
 function closeMobileDrawer(){
-  document.getElementById('notesEditor').classList.remove('drawer-open');
-  document.querySelector('.notes-sidebar').classList.remove('drawer-hidden','list-open');
-  /* Keep activeNoteId so re-opening same note preserves state */
-  if(window.innerWidth<=768){
-    document.getElementById('editorEmpty').style.display='flex';
-    document.getElementById('editorActive').style.display='none';
-  }
+  document.getElementById('notesEditor')?.classList.remove('drawer-open');
+  document.querySelector('.notes-sidebar')?.classList.remove('drawer-hidden','list-open');
 }
 
 async function toggleMobileNotesList(){
-  const sidebar=document.querySelector('.notes-sidebar');
-  if(!sidebar||window.innerWidth>768)return;
-  if(sidebar.classList.contains('list-open')){
-    closeMobileNotesList();
-    return;
-  }
-  if(window.activeNoteId&&typeof window.saveNote==='function'){
-    clearTimeout(window.autoSaveTimer);
-    if(await window.saveNote()===false)return;
-  }
-  sidebar.classList.add('list-open');
+  if(window.innerWidth>1023)return;
+  if(window.history.state?.konohaNotesEditor){window.history.back();return}
+  const saved=window.activeNoteId?await window.saveNote?.({manual:false}):true;
+  if(saved===false)return;
+  closeMobileDrawer();
 }
 
-function closeMobileNotesList(){
-  document.querySelector('.notes-sidebar')?.classList.remove('list-open');
+function closeMobileNotesList(){document.querySelector('.notes-sidebar')?.classList.remove('list-open')}
+
+let notesEditorHistoryActive=false;
+window.enterNotesEditorHistory=id=>{
+  if(window.innerWidth>1023||notesEditorHistoryActive)return;
+  const current=window.history.state&&typeof window.history.state==='object'?window.history.state:{};
+  window.history.pushState({...current,konohaNotesEditor:true,noteId:String(id)},'',window.location.href);
+  notesEditorHistoryActive=true;
+};
+window.addEventListener('popstate',()=>{
+  if(!notesEditorHistoryActive)return;
+  notesEditorHistoryActive=false;
+  void (async()=>{
+    const saved=window.activeNoteId?await window.saveNote?.({manual:false}):true;
+    if(saved===false){
+      const current=window.history.state&&typeof window.history.state==='object'?window.history.state:{};
+      window.history.pushState({...current,konohaNotesEditor:true,noteId:String(window.activeNoteId||'')},'',window.location.href);
+      notesEditorHistoryActive=true;return;
+    }
+    closeMobileDrawer();
+  })();
+});
+
+function toggleArchiveSidebar(){
+  const sidebar=document.querySelector('.notes-sidebar');if(!sidebar)return;
+  const collapsed=sidebar.classList.toggle('archive-collapsed');
+  const button=document.querySelector('.archive-collapse-btn');
+  button?.setAttribute('aria-expanded',String(!collapsed));
+  button?.setAttribute('aria-label',collapsed?'Expand archive sidebar':'Collapse archive sidebar');
 }
+function toggleFocusMode(){
+  const view=document.getElementById('view-notes');if(!view)return;
+  const enabled=view.classList.toggle('focus-mode');
+  document.getElementById('focusModeBtn')?.setAttribute('aria-pressed',String(enabled));
+  if(enabled)document.getElementById('note-content-editor')?.focus();
+}
+document.getElementById('notesList')?.addEventListener('keydown',event=>{
+  if(!['ArrowDown','ArrowUp'].includes(event.key)||!event.target.matches('.note-item-open'))return;
+  const items=[...document.querySelectorAll('#notesList .note-item-open')];const index=items.indexOf(event.target);
+  const next=items[index+(event.key==='ArrowDown'?1:-1)];if(next){event.preventDefault();next.focus()}
+});
+document.getElementById('notesList')?.addEventListener('keydown',event=>{
+  if(!['ArrowDown','ArrowUp'].includes(event.key)||!event.target.matches('.note-item-open'))return;
+  const items=[...document.querySelectorAll('#notesList .note-item-open')];const index=items.indexOf(event.target);
+  const next=items[index+(event.key==='ArrowDown'?1:-1)];if(next){event.preventDefault();next.focus()}
+});
+window.addEventListener('keydown',event=>{
+  const view=document.getElementById('view-notes');if(!view?.classList.contains('active'))return;
+  const target=event.target;const typing=target instanceof HTMLElement&&(target.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(target.tagName));
+  if(event.key==='Escape'&&view.classList.contains('focus-mode')){event.preventDefault();toggleFocusMode();return}
+  if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
+  if(event.key.toLowerCase()==='s'){event.preventDefault();void window.saveNote?.({manual:true});return}
+  if(typing)return;
+  if(event.key.toLowerCase()==='k'){event.preventDefault();document.getElementById('notesSearch')?.focus()}
+  if(event.key.toLowerCase()==='n'){event.preventDefault();void window.createNote?.()}
+});
 
 function ensureEditorState(){
   document.getElementById('editorEmptyTitle').textContent='No Scroll Selected';
@@ -233,12 +514,18 @@ function ensureEditorState(){
   else{document.getElementById('editorEmpty').style.display='flex';document.getElementById('editorActive').style.display='none'}
 }
 
-function filterNotes(){renderNotesList()}
-function setFilter(f,el){activeFilter=f;document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderNotesList()}
+let noteSearchTimer;
+function filterNotes(){clearTimeout(noteSearchTimer);noteSearchTimer=setTimeout(renderNotesList,120)}
+function setFilter(f,el){
+  activeFilter=f;
+  document.querySelectorAll('.filter-tab').forEach(tab=>{const selected=tab===el;tab.classList.toggle('active',selected);tab.setAttribute('aria-pressed',String(selected))});
+  renderNotesList();
+}
 
 // ==================== TAGS ====================
 function renderTags(tags){
-  document.getElementById('tagsList').innerHTML=tags.map((t,i)=>`<span class="tag-chip">${escapeHtml(t)}<button onclick="removeTag(${i})">×</button></span>`).join('');
+  document.getElementById('tagsList').innerHTML=tags.map((t,i)=>`<span class="tag-chip">${escapeHtml(t)}<button type="button" onclick="removeTag(${i})" aria-label="Remove ${escapeHtml(t)} tag"><i class="ui-icon" data-lucide="x" aria-hidden="true" width="12" height="12"></i></button></span>`).join('');
+  window.renderLucideIcons?.(document.getElementById('tagsList'));
 }
 // ==================== FORMAT ====================
 function fmt(cmd){document.execCommand(cmd,false,null);document.getElementById('note-content-editor').focus()}
@@ -249,7 +536,7 @@ function fmtCode(){const sel=window.getSelection();if(sel&&sel.toString())docume
 function fmtLink(){const url=prompt('Enter URL:');if(url)document.execCommand('createLink',false,url)}
 function fmtRule(){document.execCommand('insertHTML',false,'<hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>')}
 function changeFont(){document.getElementById('note-content-editor').style.fontFamily=document.getElementById('fontSelect').value}
-function handleEditorKey(e){if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveNote()}}
+function handleEditorKey(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();window.saveNote?.({manual:true})}}
 function updateWordCount(){
   const text=document.getElementById('note-content-editor').innerText||'';
   const words=text.trim()?text.trim().split(/\s+/).length:0;
@@ -260,7 +547,9 @@ function updateWordCount(){
 // ==================== TOAST ====================
 function showToast(msg,type){
   const c=document.getElementById('toast-container');
-  const t=document.createElement('div');t.className='toast'+(type?' '+type:'');t.textContent=msg;c.appendChild(t);
+  const t=document.createElement('div');t.className='toast'+(type?' '+type:'');
+  const icon=document.createElement('span');icon.className='toast-icon';icon.innerHTML=window.shinobiIcon(type==='success'?'seal-check':type==='error'?'seal-warning':'chakra');
+  t.append(icon,document.createTextNode(msg));c.appendChild(t);
   setTimeout(()=>{t.style.animation='toastOut 0.4s forwards';setTimeout(()=>t.remove(),400)},2800);
 }
 function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -857,6 +1146,7 @@ function initAuthAnimations(){
 
 function switchAuthMode(m){
   const isLogin=(m==='login');
+  document.getElementById('view-auth')?.setAttribute('data-auth-mode',isLogin?'login':'register');
   authEyeMode=isLogin?'login':'register';
   const verificationPanel=document.getElementById('verificationPanel');
   if(verificationPanel)verificationPanel.style.display='none';
@@ -881,6 +1171,7 @@ function switchAuthMode(m){
     const fields=isLogin?['#ltbadge','#ltit','#ldesc','#lf1','#lf2','#fgtw','#lbtn','#lodiv','#lalt','#lfoot']:['#rtbadge','#rtit','#rdesc','#rrow','#rf2','#rf3','#rf4','#rf5','#rbtn','#rfoot'];
     gsap.fromTo(fields,{opacity:0,y:12},{opacity:1,y:0,duration:.45,stagger:.05,ease:'power3.out'});
   }
+  updateActiveNavigation();
 }
 
 function toggleAuthPass(id,btn){
@@ -905,8 +1196,9 @@ function checkRegPassMatch(){
   const p2=document.getElementById('regPass2').value;
   const el=document.getElementById('authPassMatch');
   if(!p2){el.textContent='';el.style.color='';return}
-  if(p1===p2){el.textContent='✓ Passwords match';el.style.color='#2ecc71'}
-  else{el.textContent='✗ Passwords do not match';el.style.color='var(--red3)'}
+  if(p1===p2){el.innerHTML='<i class="ui-icon" data-lucide="circle-check" aria-hidden="true"></i> Passwords match';el.style.color='#2ecc71'}
+  else{el.innerHTML='<i class="ui-icon" data-lucide="circle-x" aria-hidden="true"></i> Passwords do not match';el.style.color='var(--red3)'}
+  window.renderLucideIcons?.(el);
 }
 
 // ==================== PROFILE ====================
@@ -936,7 +1228,8 @@ function updateProfileData(){
   document.getElementById('profileAvatar').src='data:image/svg+xml;base64,'+btoa(svg);
   const stats=window.getProfileStatistics(notes);
   const {noteCount,rank,rankIcon,rankOrder,rankIndex:currentRankIdx,nextRank,rankProgress:progressToNext,pinnedCount,totalWords,tags:allTags,lastNote,notesThisWeek:thisWeek}=stats;
-  document.getElementById('profileRank').innerHTML=rankIcon+' '+rank+' Rank';
+  const rankIconName=['rank-seal','rank-seal','chakra','flame-seal','ninja','clan-mark'][currentRankIdx]||'rank-seal';
+  document.getElementById('profileRank').innerHTML=window.shinobiIcon(rankIconName)+' '+rank+' Rank';
   document.getElementById('statRank').textContent=rank;
   document.getElementById('statRankChange').textContent=nextRank?progressToNext+'% to '+nextRank:'Maximum rank';
   document.getElementById('statNotes').textContent=noteCount;
@@ -1155,368 +1448,34 @@ document.addEventListener('keydown', e => {
 });
 
 
-// ==================== INTRO SEQUENCE ====================
 (function(){
-  // Intro plays on every page load.
+  const splash = document.querySelector('.kn-splash');
+  if(!splash) return;
+  let dismissed = false;
+  let fallbackTimer;
 
-  document.body.classList.add('intro-active');
-
-  const scrollPaper = document.getElementById('introScrollPaper');
-  const scrollContent = document.querySelector('.intro-scroll-content');
-  const fireParticles = document.getElementById('introFireParticles');
-  const introOverlay = document.getElementById('introOverlay');
-  const introContainer = document.getElementById('introScrollContainer');
-  const titleEl = document.getElementById('introTitle');
-  const subtitleEl = document.getElementById('introSubtitle');
-
-  const titleText = 'KONOHA NOTES';
-  const subtitleText = 'Seal Your Secrets';
-
-  // Burn origin - bottom-right corner of paper
-  const BURN_ORIGIN_X = 0.85;
-  const BURN_ORIGIN_Y = 0.90;
-  const BURN_DURATION = 3500;
-  const MAX_EMBERS = 80; // Reduced from 220
-  const CHARRED_STEPS = 60; // Reduced from 140
-
-  // Typewriter effect
-  function typeText(element, text, delay, speed){
-    return new Promise(resolve => {
-      setTimeout(() => {
-        let i = 0;
-        const interval = setInterval(() => {
-          element.textContent += text[i];
-          i++;
-          if(i >= text.length){
-            clearInterval(interval);
-            resolve();
-          }
-        }, speed);
-      }, delay);
-    });
+  function finish(){
+    if(dismissed) return;
+    dismissed = true;
+    window.clearTimeout(fallbackTimer);
+    splash.removeEventListener('click', dismiss);
+    document.removeEventListener('keydown', dismiss);
+    splash.removeEventListener('animationend', onAnimationFinish);
+    splash.removeEventListener('animationcancel', onAnimationFinish);
+    splash.remove();
   }
 
-  // Create falling fire particles in background
-  function createFireParticles(){
-    if(!fireParticles) return;
-    fireParticles.classList.add('active');
-    const interval = setInterval(() => {
-      if(!document.getElementById('introOverlay')){
-        clearInterval(interval);
-        return;
-      }
-      const ember = document.createElement('div');
-      ember.className = 'intro-ember';
-      ember.style.left = Math.random() * 100 + '%';
-      ember.style.animationDuration = (2 + Math.random() * 3) + 's';
-      ember.style.animationDelay = Math.random() * 1 + 's';
-      ember.style.width = (2 + Math.random() * 3) + 'px';
-      ember.style.height = ember.style.width;
-      fireParticles.appendChild(ember);
-      setTimeout(() => ember.remove(), 5000);
-    }, 100);
-    setTimeout(() => clearInterval(interval), 4000);
+  function dismiss(){finish()}
+  function onAnimationFinish(event){
+    if(event.target === splash && event.animationName === 'kn-splash-dismiss') finish();
   }
 
-  // ============ OPTIMIZED BURN EFFECT ============
-
-  function startBurnEffect(){
-    if(!scrollPaper) return;
-
-    const paperRect = scrollPaper.getBoundingClientRect();
-    const dpr = 1; // Force 1x for performance - still looks great
-
-    // Create canvas for charred edge
-    const canvas = document.createElement('canvas');
-    canvas.className = 'intro-burn-canvas';
-    canvas.width = Math.floor(paperRect.width * dpr);
-    canvas.height = Math.floor(paperRect.height * dpr);
-    canvas.style.width = paperRect.width + 'px';
-    canvas.style.height = paperRect.height + 'px';
-    scrollPaper.appendChild(canvas);
-
-    const ctx = canvas.getContext('2d', { alpha: true });
-
-    // Create smoke element
-    const smoke = document.createElement('div');
-    smoke.className = 'intro-burn-smoke';
-    scrollPaper.appendChild(smoke);
-
-    // Create ignition flash
-    const flash = document.createElement('div');
-    flash.className = 'intro-ignite-flash';
-    scrollPaper.appendChild(flash);
-
-    // Activate elements
-    requestAnimationFrame(() => {
-      canvas.classList.add('active');
-      flash.classList.add('active');
-    });
-
-    // Pre-calculate constants
-    const originX = paperRect.width * BURN_ORIGIN_X;
-    const originY = paperRect.height * BURN_ORIGIN_Y;
-    const maxRadius = Math.sqrt(
-      Math.pow(Math.max(originX, paperRect.width - originX), 2) +
-      Math.pow(Math.max(originY, paperRect.height - originY), 2)
-    );
-
-    // Pre-generate angle table for charred ring
-    const angleTable = new Float32Array(CHARRED_STEPS + 1);
-    for(let i = 0; i <= CHARRED_STEPS; i++){
-      angleTable[i] = (i / CHARRED_STEPS) * Math.PI * 2;
-    }
-
-    // Burn state
-    let startTime = null;
-    let embers = [];
-    let zoomTriggered = false;
-    let animId = null;
-    let lastSpawnTime = 0;
-
-    // Ember class - optimized
-    class Ember {
-      constructor(angle, dist){
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        this.x = originX + cos * dist;
-        this.y = originY + sin * dist;
-        this.vx = (Math.random() - 0.5) * 1.2 - 0.3;
-        this.vy = -Math.random() * 1.2 - 0.3;
-        this.life = 1;
-        this.decay = 0.008 + Math.random() * 0.012;
-        this.size = 1.5 + Math.random() * 2.5;
-        this.hue = 20 + Math.random() * 20;
-      }
-
-      update(){
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vy -= 0.015;
-        this.life -= this.decay;
-        this.size *= 0.992;
-      }
-    }
-
-    // Batch spawn embers
-    function spawnEmbers(currentRadius, timestamp){
-      if(timestamp - lastSpawnTime < 16) return; // Throttle to ~60fps
-      lastSpawnTime = timestamp;
-
-      const spawnCount = Math.min(3, MAX_EMBERS - embers.length);
-      for(let i = 0; i < spawnCount; i++){
-        const angle = Math.random() * Math.PI * 2;
-        const dist = currentRadius * (0.7 + Math.random() * 0.3);
-        embers.push(new Ember(angle, dist));
-      }
-    }
-
-    // Optimized draw function
-    function drawFrame(currentRadius, time){
-      ctx.clearRect(0, 0, paperRect.width, paperRect.height);
-
-      // Batch draw charred ring
-      ctx.beginPath();
-
-      // Outer ring
-      for(let i = 0; i <= CHARRED_STEPS; i++){
-        const angle = angleTable[i];
-        const noise = Math.sin(angle * 6 + time * 0.002) * 4 +
-                      Math.sin(angle * 12 + time * 0.004) * 2;
-        const r = currentRadius + 6 + noise;
-        const x = originX + Math.cos(angle) * r;
-        const y = originY + Math.sin(angle) * r;
-        if(i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-
-      // Inner ring (reverse for hole)
-      const innerR = Math.max(0, currentRadius - 3);
-      if(innerR > 0){
-        for(let i = CHARRED_STEPS; i >= 0; i--){
-          const angle = angleTable[i];
-          const noise = Math.sin(angle * 6 + time * 0.002) * 2;
-          const r = innerR + noise;
-          const x = originX + Math.cos(angle) * r;
-          const y = originY + Math.sin(angle) * r;
-          ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-      }
-
-      // Fill charred area
-      ctx.fillStyle = 'rgba(35, 15, 6, 0.6)';
-      ctx.fill();
-
-      // Stroke fire edge - single efficient stroke
-      ctx.strokeStyle = 'rgba(255, 130, 40, 0.9)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Draw embers in batch
-      if(embers.length > 0){
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-
-        for(let i = 0; i < embers.length; i++){
-          const e = embers[i];
-          if(e.life <= 0) continue;
-
-          ctx.globalAlpha = e.life * 0.7;
-          ctx.fillStyle = `hsl(${e.hue}, 100%, 60%)`;
-          ctx.beginPath();
-          ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
-    }
-
-    function updateCSSMask(currentRadius){
-      const inner = Math.max(0, currentRadius - 5);
-      const maskValue = `radial-gradient(circle ${currentRadius}px at ${originX}px ${originY}px, transparent ${inner}px, rgba(0,0,0,0.5) ${inner + 4}px, #000 ${currentRadius}px)`;
-
-      scrollPaper.style.webkitMaskImage = maskValue;
-      scrollPaper.style.maskImage = maskValue;
-    }
-
-    function triggerZoom(){
-      if(zoomTriggered) return;
-      zoomTriggered = true;
-
-      const viewportOX = ((paperRect.left + originX) / window.innerWidth) * 100;
-      const viewportOY = ((paperRect.top + originY) / window.innerHeight) * 100;
-
-      if(introContainer){
-        introContainer.style.transformOrigin = `${viewportOX}% ${viewportOY}%`;
-      }
-      if(introOverlay){
-        introOverlay.style.transformOrigin = `${viewportOX}% ${viewportOY}%`;
-      }
-
-      requestAnimationFrame(() => {
-        if(introContainer) introContainer.classList.add('zoom-through');
-        if(introOverlay) introOverlay.classList.add('zoom-through');
-      });
-
-      smoke.classList.add('active');
-
-      if(scrollContent){
-        scrollContent.style.transition = 'opacity 0.5s ease';
-        scrollContent.style.opacity = '0';
-      }
-
-      document.body.classList.add('intro-done');
-
-      setTimeout(() => {
-        if(introOverlay) introOverlay.classList.add('removed');
-        document.body.classList.remove('intro-active', 'intro-done');
-        if(animId) cancelAnimationFrame(animId);
-
-        if(canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
-        if(smoke && smoke.parentNode) smoke.parentNode.removeChild(smoke);
-        if(flash && flash.parentNode) flash.parentNode.removeChild(flash);
-
-        scrollPaper.style.webkitMaskImage = '';
-        scrollPaper.style.maskImage = '';
-        scrollPaper.classList.remove('burning');
-      }, 2000);
-    }
-
-    function burnLoop(timestamp){
-      if(!startTime) startTime = timestamp;
-      const elapsed = timestamp - startTime;
-      const burnProgress = Math.min(elapsed / BURN_DURATION, 1);
-
-      const easedProgress = 1 - Math.pow(1 - burnProgress, 3);
-      const currentRadius = maxRadius * easedProgress;
-
-      updateCSSMask(currentRadius);
-
-      if(embers.length < MAX_EMBERS && burnProgress < 0.9){
-        spawnEmbers(currentRadius, timestamp);
-      }
-
-      // Update embers
-      let activeEmbers = 0;
-      for(let i = 0; i < embers.length; i++){
-        const e = embers[i];
-        e.update();
-        if(e.life > 0) activeEmbers++;
-      }
-
-      drawFrame(currentRadius, timestamp);
-
-      if(burnProgress >= 0.62 && !zoomTriggered){
-        triggerZoom();
-      }
-
-      if(burnProgress < 1 || activeEmbers > 0){
-        animId = requestAnimationFrame(burnLoop);
-      } else if(!zoomTriggered) {
-        triggerZoom();
-      }
-    }
-
-    scrollPaper.classList.add('burning');
-    animId = requestAnimationFrame(burnLoop);
-  }
-
-  // Sequence
-  async function runIntro(){
-    // Reset state
-    if(titleEl) titleEl.textContent = '';
-    if(subtitleEl) subtitleEl.textContent = '';
-    if(scrollContent){
-      scrollContent.style.opacity = '';
-      scrollContent.classList.remove('visible');
-    }
-    if(scrollPaper){
-      scrollPaper.classList.remove('unrolled', 'burning');
-      scrollPaper.style.webkitMaskImage = '';
-      scrollPaper.style.maskImage = '';
-    }
-    if(introContainer){
-      introContainer.classList.remove('zoom-through');
-      introContainer.style.transformOrigin = '';
-    }
-    if(introOverlay){
-      introOverlay.classList.remove('zoom-through', 'done', 'removed');
-      introOverlay.style.transformOrigin = '';
-      introOverlay.style.opacity = '';
-      introOverlay.style.animation = '';
-    }
-    document.body.classList.remove('intro-done');
-
-    // 1. Scroll appears (0.5s)
-    await new Promise(r => setTimeout(r, 500));
-
-    // 2. Scroll unrolls (1.0s)
-    if(scrollPaper) scrollPaper.classList.add('unrolled');
-    await new Promise(r => setTimeout(r, 2500));
-
-    // 3. Fire particles start falling (3.5s)
-    createFireParticles();
-
-    // 4. Text writes itself (4.0s)
-    if(scrollContent) scrollContent.classList.add('visible');
-    await typeText(titleEl, titleText, 0, 120);
-    await typeText(subtitleEl, subtitleText, 300, 80);
-
-    // 5. Text stays visible for 2 seconds (6.5s)
-    await new Promise(r => setTimeout(r, 2000));
-
-    // 6. BURN BEGINS at bottom-right corner (8.5s)
-    if(scrollContent){
-      scrollContent.style.transition = 'opacity 2s ease';
-      scrollContent.style.opacity = '0.4';
-    }
-
-    startBurnEffect();
-  }
-
-  runIntro();
+  splash.addEventListener('click', dismiss);
+  document.addEventListener('keydown', dismiss);
+  splash.addEventListener('animationend', onAnimationFinish);
+  splash.addEventListener('animationcancel', onAnimationFinish);
+  const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  fallbackTimer = window.setTimeout(finish, reducedMotion ? 1600 : 3200);
 })();
 
 
