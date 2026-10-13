@@ -12,7 +12,7 @@
 
 
 <base target="_blank">
-  <link rel="stylesheet" href="assets/css/app.css?v=20261013-18">
+  <link rel="stylesheet" href="assets/css/app.css?v=20261013-20">
 </head>
 <body>
 <div class="kn-splash">
@@ -713,10 +713,21 @@
           <button class="toolbar-btn" id="pinBtn" onclick="togglePin()"><i class="ui-icon shinobi-icon" data-shinobi-icon="seal-pin" aria-hidden="true" width="14" height="14"></i> <span>Pin</span></button>
           <button class="toolbar-btn" id="readBtn" type="button" onclick="toggleReadMode()"><i class="ui-icon" data-lucide="eye" aria-hidden="true" width="14" height="14"></i> <span>Read</span></button>
           <button class="toolbar-btn" id="focusModeBtn" type="button" onclick="toggleFocusMode()" aria-pressed="false"><i class="ui-icon shinobi-icon" data-shinobi-icon="chakra-focus" aria-hidden="true" width="14" height="14"></i> <span>Focus</span></button>
+          <button class="snippet-launch-btn" id="quickSnippetsToggle" type="button" onclick="toggleQuickSnippets()" aria-label="Open quick snippets" aria-expanded="false" aria-controls="quickSnippetsPanel" title="Quick snippets"><i class="ui-icon snippet-launch-icon" data-lucide="clipboard-list" aria-hidden="true"></i></button>
           <button class="toolbar-btn save-btn" type="button" onclick="saveNote({manual:true})"><i class="ui-icon shinobi-icon" data-shinobi-icon="scroll-save" aria-hidden="true" width="14" height="14"></i> <span>Seal</span></button>
           <button class="toolbar-btn danger" type="button" onclick="promptDelete()"><i class="ui-icon" data-lucide="trash-2" aria-hidden="true" width="14" height="14"></i> <span>Burn</span></button>
         </div>
       </div>
+      <section id="quickSnippetsPanel" class="quick-snippets-popover" aria-label="Quick snippets" aria-hidden="true" hidden>
+        <div class="quick-snippets-heading"><div><strong>Quick snippets</strong><span>Saved on this browser</span></div><button class="quick-snippets-close" type="button" onclick="toggleQuickSnippets(false)" aria-label="Close quick snippets">×</button></div>
+        <form class="snippet-composer" id="snippetForm" onsubmit="addQuickSnippet(event)">
+          <input id="snippetLabel" type="text" maxlength="48" placeholder="Label (optional)" aria-label="Snippet label" autocomplete="off" />
+          <textarea id="snippetText" rows="3" maxlength="12000" placeholder="Write or paste reusable text…" aria-label="Text to save" required></textarea>
+          <button class="snippet-add-btn" type="submit">＋ Save snippet</button>
+        </form>
+        <div class="snippets-list-heading"><span id="snippetCount">Saved snippets · 0</span><button type="button" id="clearSnippetsBtn" onclick="clearQuickSnippets()" hidden>Clear all</button></div>
+        <div class="snippets-list" id="snippetsList" aria-live="polite"></div>
+      </section>
       <div class="format-bar">
         <button class="fmt-btn" type="button" data-editor-command="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
         <button class="fmt-btn" type="button" data-editor-command="redo" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
@@ -826,9 +837,9 @@
 </dialog>
 
   <script defer src="assets/js/lucide.min.js"></script>
-  <script defer src="assets/js/legacy-ui.js?v=20261013-12"></script>
+  <script defer src="assets/js/legacy-ui.js?v=20261013-15"></script>
   <script defer src="firebase/firebase-config.js"></script>
-  <script type="module" src="src/app/bootstrap/application.js?v=20261013-9"></script>
+  <script type="module" src="src/app/bootstrap/application.js?v=20261013-11"></script>
 </body>
 </html>
 

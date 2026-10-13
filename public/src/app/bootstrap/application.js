@@ -24,6 +24,35 @@ const noteRevisions = new Map();
 const savedNoteRevisions = new Map();
 const noteSaveTasks = new Map();
 const pendingNoteSaves = new Set();
+const noteDraftStorageKey = uid => `konoha-notes-drafts:v1:${uid}`;
+function readLocalNoteDrafts(uid) {
+  if (!uid) return {};
+  try {
+    const value = JSON.parse(localStorage.getItem(noteDraftStorageKey(uid)) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch { return {}; }
+}
+function writeLocalNoteDraft(uid, note) {
+  if (!uid || !note?.id) return false;
+  try {
+    const drafts = readLocalNoteDrafts(uid);
+    drafts[String(note.id)] = { title: note.title || 'Untitled', content: note.content || '', tags: Array.isArray(note.tags) ? note.tags : [], pinned: !!note.pinned, updatedAt: Date.now() };
+    localStorage.setItem(noteDraftStorageKey(uid), JSON.stringify(drafts));
+    return true;
+  } catch (error) {
+    reportError('backup pending scroll locally', error);
+    return false;
+  }
+}
+function clearLocalNoteDraft(uid, id) {
+  if (!uid) return;
+  try {
+    const drafts = readLocalNoteDrafts(uid);
+    delete drafts[String(id)];
+    if (Object.keys(drafts).length) localStorage.setItem(noteDraftStorageKey(uid), JSON.stringify(drafts));
+    else localStorage.removeItem(noteDraftStorageKey(uid));
+  } catch (error) { reportError('clear saved local scroll draft', error); }
+}
 let resendCooldownUntil = 0;
 let resendCooldownTimer = null;
 const RESEND_COOLDOWN_MS = 30_000;
@@ -193,9 +222,18 @@ async function loadNotes(uid = lastUser?.uid) {
   try {
     const notes = await notesController.load();
     if (authState !== 'authenticated' || lastUser?.uid !== uid) return;
-    window.notes = notes;
+    const drafts = readLocalNoteDrafts(uid);
+    window.notes = notes.map(note => {
+      const draft = drafts[String(note.id)];
+      if (!draft || typeof draft.content !== 'string' || draft.content.length > 180_000 || typeof draft.title !== 'string') return note;
+      return { ...note, title: draft.title.slice(0,255) || 'Untitled', content: sanitizeNoteHtml(draft.content), tags: Array.isArray(draft.tags) ? draft.tags.filter(tag => typeof tag === 'string').slice(0,20) : note.tags, pinned: !!draft.pinned, hasLocalDraft: true };
+    });
     noteRevisions.clear(); savedNoteRevisions.clear(); pendingNoteSaves.clear();
     notes.forEach(note => { noteRevisions.set(String(note.id), 0); savedNoteRevisions.set(String(note.id), 0); });
+    window.notes.forEach(note => {
+      if (!note.hasLocalDraft) return;
+      noteRevisions.set(String(note.id), 1); savedNoteRevisions.set(String(note.id), 0); pendingNoteSaves.add(String(note.id));
+    });
     window.renderNotesList?.(); refreshProfile();
   }
   catch (error) {
@@ -297,7 +335,8 @@ window.openNote = async id => {
   }
   window.renderTags?.(note.tags || []); window.updatePinBtn?.(note.pinned); window.updateReadBtn?.(); window.updateWordCount?.();
   const savedLabel = Number.isFinite(note.updatedAt) && note.updatedAt > 0 ? `Sealed: ${new Date(note.updatedAt).toLocaleTimeString()}` : 'Saved';
-  window.setNoteSaveStatus?.('saved', savedLabel);
+  if (pendingNoteSaves.has(String(id))) window.setNoteSaveStatus?.('failed', 'Local draft restored — retry save');
+  else window.setNoteSaveStatus?.('saved', savedLabel);
   document.querySelectorAll('.note-item').forEach(element => element.classList.toggle('active', element.dataset.id === String(id)));
   byId('editorBodyDiv')?.classList.remove('read-mode'); if (byId('note-content-editor')) byId('note-content-editor').contentEditable = 'true';
   window.syncNotesAppBarBehavior?.();
@@ -343,7 +382,7 @@ window.retryNoteSave = async (id, event) => {
   return saved;
 };
 window.addEventListener('beforeunload', event => {
-  if (!pendingNoteSaves.size) return;
+  if (![...pendingNoteSaves].some(id => !readLocalNoteDrafts(lastUser?.uid)[id])) return;
   event.preventDefault();
   event.returnValue = '';
 });
@@ -354,6 +393,7 @@ function markNoteDirty(note) {
   const id = String(note.id);
   noteRevisions.set(id, (noteRevisions.get(id) || 0) + 1);
   pendingNoteSaves.add(id);
+  writeLocalNoteDraft(lastUser?.uid, note);
   if (String(window.activeNoteId) === id) setNoteSaveStatus('unsaved', 'Unsaved changes');
   window.renderNotesList?.();
 }
@@ -385,16 +425,24 @@ function flushNoteSave(id) {
         const saved = await notesController.update(id, snapshot);
         if (lastUser?.uid !== uid || authState !== 'authenticated') return false;
         savedNoteRevisions.set(id, revision);
-        if ((noteRevisions.get(id) || 0) === revision) pendingNoteSaves.delete(id);
+        if ((noteRevisions.get(id) || 0) === revision) {
+          pendingNoteSaves.delete(id);
+          clearLocalNoteDraft(uid, id);
+          if (!pendingNoteSaves.size) window.notesLeaveFailureAcknowledged = false;
+        }
         const latest = window.notes.find(item => String(item.id) === id);
-        if (latest) latest.updatedAt = saved.updatedAt;
+        if (latest) { latest.updatedAt = saved.updatedAt; if ((noteRevisions.get(id) || 0) === revision) delete latest.hasLocalDraft; }
         window.renderNotesList?.();
         refreshProfile();
         if (String(window.activeNoteId) === id && (noteRevisions.get(id) || 0) === revision) {
           setNoteSaveStatus('saved', `Sealed: ${new Date(saved.updatedAt).toLocaleTimeString()}`);
         }
       } catch (error) {
-        if (String(window.activeNoteId) === id) setNoteSaveStatus('failed', 'Seal failed — your changes remain here');
+        if (String(window.activeNoteId) === id) {
+          setNoteSaveStatus('failed', `Save failed: ${userMessage(error)}`);
+          const status = byId('lastSaved');
+          if (status) status.title = error?.code ? `Error: ${error.code}` : 'Save failed; a local draft was kept when browser storage is available.';
+        }
         reportError('save note', error);
         window.showToast?.('Could not seal this scroll. Your changes are still in the editor; retry when ready.', 'error');
         return false;

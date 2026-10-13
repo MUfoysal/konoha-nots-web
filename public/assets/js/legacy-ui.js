@@ -218,12 +218,13 @@ function scrollToSection(id){navToHome(id)}
 
 // ==================== VIEW ROUTING ====================
 function showView(name,sub){
-  if(name!=='notes'&&!notesLeaveGuardBypass&&document.getElementById('view-notes')?.classList.contains('active')&&window.hasPendingNoteSaves?.()){
+  if(name!=='notes'&&!notesLeaveGuardBypass&&!window.notesLeaveFailureAcknowledged&&document.getElementById('view-notes')?.classList.contains('active')&&window.hasPendingNoteSaves?.()){
     if(notesLeaveGuardActive)return;
     notesLeaveGuardActive=true;
     void (async()=>{
       const saved=await window.flushAllNoteSaves?.();
-      if(saved===false&&!window.confirm('This scroll could not be sealed. Stay here, or continue leaving with changes still pending so you can retry later?')){notesLeaveGuardActive=false;return}
+      if(saved===false&&!window.confirm('This scroll could not be sealed. A local draft has been kept when browser storage is available. Stay here, or continue leaving and retry later?')){notesLeaveGuardActive=false;return}
+      if(saved===false)window.notesLeaveFailureAcknowledged=true;
       notesLeaveGuardBypass=true;
       try{showView(name,sub)}finally{notesLeaveGuardBypass=false;notesLeaveGuardActive=false}
     })();
@@ -460,6 +461,46 @@ function setFilter(f,el){
   document.querySelectorAll('.filter-tab').forEach(tab=>{const selected=tab===el;tab.classList.toggle('active',selected);tab.setAttribute('aria-pressed',String(selected))});
   renderNotesList();
 }
+
+// Quick snippets are intentionally stored only in this browser; they never enter note sync.
+const QUICK_SNIPPETS_KEY='konoha-quick-snippets:v1';
+function readQuickSnippets(){try{const value=JSON.parse(localStorage.getItem(QUICK_SNIPPETS_KEY)||'[]');return Array.isArray(value)?value.filter(item=>item&&typeof item.text==='string'):[]}catch{return []}}
+function writeQuickSnippets(items){try{localStorage.setItem(QUICK_SNIPPETS_KEY,JSON.stringify(items));return true}catch{window.showToast?.('Browser storage is full. Remove a snippet and try again.','error');return false}}
+function renderQuickSnippets(){
+  const list=document.getElementById('snippetsList');if(!list)return;
+  const snippets=readQuickSnippets();const count=document.getElementById('snippetCount');if(count)count.textContent=`Saved snippets · ${snippets.length}`;
+  const clear=document.getElementById('clearSnippetsBtn');if(clear)clear.hidden=!snippets.length;
+  list.replaceChildren();
+  if(!snippets.length){const empty=document.createElement('div');empty.className='snippets-empty';empty.innerHTML='<span class="snippet-empty-mark" aria-hidden="true">✳</span><strong>No snippets yet</strong><span>Save a phrase or template here for quick reuse.</span>';list.append(empty);return}
+  snippets.slice().reverse().forEach((snippet,index)=>{
+    const actualIndex=snippets.length-1-index;const card=document.createElement('article');card.className='snippet-card';
+    const head=document.createElement('div');head.className='snippet-card-head';const title=document.createElement('strong');title.textContent=snippet.label||'Untitled snippet';const size=document.createElement('span');size.textContent=`${snippet.text.length.toLocaleString()} chars`;head.append(title,size);
+    const body=document.createElement('p');body.className='snippet-card-text';body.textContent=snippet.text;card.append(head,body);
+    const actions=document.createElement('div');actions.className='snippet-card-actions';const copy=document.createElement('button');copy.type='button';copy.className='snippet-copy-btn';copy.innerHTML='<span aria-hidden="true">⧉</span> Copy text';copy.addEventListener('click',()=>copyQuickSnippet(snippet.text,copy));
+    const remove=document.createElement('button');remove.type='button';remove.className='snippet-delete-btn';remove.textContent='Remove';remove.setAttribute('aria-label',`Remove ${snippet.label||'snippet'}`);remove.addEventListener('click',()=>{const next=readQuickSnippets();next.splice(actualIndex,1);if(writeQuickSnippets(next))renderQuickSnippets()});actions.append(copy,remove);card.append(actions);list.append(card);
+  });
+}
+function toggleQuickSnippets(force){
+  const panel=document.getElementById('quickSnippetsPanel');const trigger=document.getElementById('quickSnippetsToggle');if(!panel||!trigger)return;
+  const open=typeof force==='boolean'?force:panel.hidden;panel.hidden=!open;panel.setAttribute('aria-hidden',String(!open));trigger.setAttribute('aria-expanded',String(open));trigger.classList.toggle('active',open);
+  if(open){renderQuickSnippets();document.getElementById('snippetText')?.focus()}
+}
+function addQuickSnippet(event){
+  event.preventDefault();const text=document.getElementById('snippetText')?.value||'';if(!text.trim())return;
+  const snippets=readQuickSnippets();if(snippets.length>=50){window.showToast?.('The field kit holds up to 50 snippets. Remove one to make room.','error');return}
+  snippets.push({id:window.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`,label:(document.getElementById('snippetLabel')?.value||'').trim(),text,createdAt:Date.now()});
+  if(writeQuickSnippets(snippets)){document.getElementById('snippetForm')?.reset();renderQuickSnippets();window.showToast?.('Snippet added to your field kit','success')}
+}
+async function copyQuickSnippet(text,button){
+  try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);else{const helper=document.createElement('textarea');helper.value=text;helper.style.position='fixed';helper.style.opacity='0';document.body.append(helper);helper.select();const copied=document.execCommand('copy');helper.remove();if(!copied)throw new Error('Clipboard unavailable')}
+    const previous=button.innerHTML;button.textContent='Copied';button.classList.add('copied');window.setTimeout(()=>{button.innerHTML=previous;button.classList.remove('copied')},1300);window.showToast?.('Copied. Paste it into your scroll.','success')
+  }catch{window.showToast?.('Could not copy. Check clipboard permission and try again.','error')}
+}
+function clearQuickSnippets(){if(!readQuickSnippets().length)return;if(!window.confirm('Remove every saved quick snippet from this browser?'))return;if(writeQuickSnippets([]))renderQuickSnippets()}
+window.toggleQuickSnippets=toggleQuickSnippets;window.addQuickSnippet=addQuickSnippet;window.clearQuickSnippets=clearQuickSnippets;
+renderQuickSnippets();
+document.addEventListener('pointerdown',event=>{if(!event.target.closest('#quickSnippetsPanel,#quickSnippetsToggle'))toggleQuickSnippets(false)});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!document.getElementById('quickSnippetsPanel')?.hidden){toggleQuickSnippets(false);document.getElementById('quickSnippetsToggle')?.focus()}});
 
 // ==================== TAGS ====================
 function renderTags(tags){

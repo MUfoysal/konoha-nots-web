@@ -3425,3 +3425,45 @@ input,textarea,button,select{-webkit-appearance:none;appearance:none;border-radi
   .profile-avatar-crop-controls .btn{margin-top:16px}
 }
 
+/* Compact quick snippets popover attached to the note editor. */
+#view-notes #editorActive{position:relative}
+#view-notes .snippet-launch-btn{display:grid;place-items:center;flex:none;width:38px;height:36px;padding:0;border:1px solid rgba(192,57,43,.3);border-radius:3px;background:linear-gradient(145deg,rgba(192,57,43,.1),rgba(255,255,255,.015));color:var(--text2);cursor:pointer;transition:border-color .2s,background .2s,color .2s,transform .2s}
+#view-notes .snippet-launch-btn:hover,#view-notes .snippet-launch-btn.active{transform:translateY(-1px);border-color:rgba(192,57,43,.68);background:rgba(192,57,43,.14);color:#f08a80}
+#view-notes .snippet-launch-icon{width:17px;height:17px;animation:snippetIconBreathe 2.8s ease-in-out infinite;transform-origin:center}
+@keyframes snippetIconBreathe{0%,100%{filter:drop-shadow(0 0 0 rgba(192,57,43,0));transform:translateY(0)}50%{filter:drop-shadow(0 0 5px rgba(192,57,43,.5));transform:translateY(-1px)}}
+#view-notes .quick-snippets-popover{position:absolute;z-index:20;top:62px;right:14px;display:flex;width:min(360px,calc(100% - 28px));max-height:min(68vh,620px);flex-direction:column;gap:10px;overflow-y:auto;padding:13px;border:1px solid rgba(192,57,43,.38);border-radius:6px;background:linear-gradient(145deg,#1d1b22,#131218 72%);box-shadow:0 18px 48px rgba(0,0,0,.58),0 0 24px rgba(192,57,43,.08);animation:snippetPopoverIn .18s ease both}
+#view-notes .quick-snippets-popover[hidden]{display:none!important}
+@keyframes snippetPopoverIn{from{opacity:0;transform:translateY(-5px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+#view-notes .quick-snippets-heading{display:flex;align-items:center;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid rgba(192,57,43,.2)}
+#view-notes .quick-snippets-heading>div{display:flex;flex-direction:column;gap:3px}
+#view-notes .quick-snippets-heading strong{color:var(--text1);font:500 .78rem var(--font-display);letter-spacing:.08em}
+#view-notes .quick-snippets-heading span{color:var(--text3);font-size:.58rem}
+#view-notes .quick-snippets-close{width:28px;height:28px;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--text3);font-size:1.25rem;cursor:pointer}
+#view-notes .quick-snippets-close:hover{border-color:var(--border);color:var(--text1)}
+#view-notes .snippet-composer{display:flex;flex-direction:column;gap:7px}
+#view-notes .snippet-composer input,#view-notes .snippet-composer textarea{width:100%;border:1px solid rgba(255,255,255,.1);border-radius:3px;outline:none;background:rgba(8,9,13,.55);color:var(--text1);font:400 .7rem var(--font-body);transition:border-color .2s,box-shadow .2s}
+#view-notes .snippet-composer input{height:34px;padding:0 9px}
+#view-notes .snippet-composer textarea{min-height:65px;resize:vertical;padding:8px 9px;line-height:1.5}
+#view-notes .snippet-composer input:focus,#view-notes .snippet-composer textarea:focus{border-color:rgba(192,57,43,.65);box-shadow:0 0 0 3px rgba(192,57,43,.09)}
+#view-notes .snippet-composer input::placeholder,#view-notes .snippet-composer textarea::placeholder{color:var(--text3);opacity:.75}
+#view-notes .snippet-add-btn{min-height:33px;border:1px solid rgba(192,57,43,.4);border-radius:3px;background:rgba(192,57,43,.11);color:var(--text1);font:500 .6rem var(--font-display);letter-spacing:.09em;cursor:pointer;transition:background .2s,border-color .2s}
+#view-notes .snippet-add-btn:hover{border-color:var(--red);background:rgba(192,57,43,.22)}
+#view-notes .snippets-list-heading{display:flex;align-items:center;justify-content:space-between;padding-top:2px;color:var(--text2);font:500 .57rem var(--font-display);letter-spacing:.1em;text-transform:uppercase}
+#view-notes .snippets-list-heading button{border:0;background:transparent;color:var(--red3);font:500 .53rem var(--font-display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+#view-notes .snippets-list{display:flex;flex-direction:column;gap:7px}
+#view-notes .snippet-card{overflow:hidden;border:1px solid rgba(255,255,255,.075);border-left:2px solid rgba(192,57,43,.62);border-radius:4px;background:rgba(255,255,255,.025);animation:snippetPopoverIn .2s ease both}
+#view-notes .snippet-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 9px 0}
+#view-notes .snippet-card-head strong{overflow:hidden;color:var(--text1);font:500 .65rem var(--font-display);text-overflow:ellipsis;white-space:nowrap}
+#view-notes .snippet-card-head>span{flex:none;color:var(--text3);font-size:.5rem}
+#view-notes .snippet-card-text{display:-webkit-box;overflow:hidden;margin:6px 9px 8px;color:var(--text2);font-size:.62rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+#view-notes .snippet-card-actions{display:flex;justify-content:space-between;padding:5px 8px;border-top:1px solid rgba(255,255,255,.05)}
+#view-notes .snippet-copy-btn,#view-notes .snippet-delete-btn{min-height:26px;padding:0 8px;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--text2);font:500 .53rem var(--font-display);cursor:pointer}
+#view-notes .snippet-copy-btn{border-color:rgba(192,57,43,.24);color:var(--red3)}
+#view-notes .snippet-copy-btn:hover,#view-notes .snippet-copy-btn.copied{background:rgba(192,57,43,.12);color:#ff9b90}
+#view-notes .snippet-delete-btn:hover{color:#ff8b82}
+#view-notes .snippets-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;border:1px dashed rgba(255,255,255,.1);border-radius:4px;text-align:center}
+#view-notes .snippet-empty-mark{color:var(--red3);font-size:1rem}
+#view-notes .snippets-empty strong{color:var(--text2);font:500 .63rem var(--font-display)}
+#view-notes .snippets-empty>span:last-child{color:var(--text3);font-size:.58rem;line-height:1.45}
+@media(max-width:620px){#view-notes .quick-snippets-popover{top:58px;right:8px;width:min(340px,calc(100% - 16px));max-height:64vh}.toolbar-actions .snippet-launch-btn{width:34px;height:32px}}
+
