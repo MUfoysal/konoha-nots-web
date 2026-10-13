@@ -21,7 +21,7 @@ The rules tests use Auth test contexts and the Firestore emulator; they do not n
 
 1. Create the Firebase project/Web App, enable Email/Password and Google providers, and configure authorized production domains.
 2. Replace Web App placeholders and optionally set the reCAPTCHA v3 App Check site key.
-3. Review `firestore.rules`, then deploy with `firebase use --add` and `firebase deploy --only firestore:rules,firestore:indexes,hosting`.
+3. Review `firestore.rules`, then deploy with `firebase use --add` and `firebase deploy --only firestore:rules,firestore:indexes,hosting`. Profile avatar files are bundled with Hosting; Firestore stores only the selected image name and crop settings.
 4. Verify auth action URLs, sender templates, reset and verification emails, and Google popup behavior on the deployed domain.
 5. After valid App Check traffic is observed, enable Auth/Firestore App Check enforcement in Firebase Console.
 

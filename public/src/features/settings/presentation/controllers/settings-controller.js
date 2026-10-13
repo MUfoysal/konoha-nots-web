@@ -6,6 +6,8 @@ export class SettingsController {
   getCapabilities() { return this.repository.getCapabilities(); }
   refreshAccount() { return this.repository.refreshAccount(); }
   updateProfile(input) { return useCases.updateSettingsProfile(this.repository, input); }
+  selectAvatar(choice) { return this.repository.selectAvatar(choice); }
+  removeAvatar() { return this.repository.removeAvatar(); }
   changePassword(input) { return useCases.changeSettingsPassword(this.repository, input); }
   requestEmailChange(email, password) { return useCases.requestSettingsEmailChange(this.repository, email, password); }
 }

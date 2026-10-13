@@ -3,7 +3,7 @@ import {
   reload, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut, updateProfile,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { userFromAuth } from '../../domain/entities/user.js';
+import { userFromAuth } from '../../domain/entities/user.js?v=20261013-2';
 
 export class FirebaseAuthDataSource {
   constructor(auth, db) { this.auth = auth; this.db = db; }

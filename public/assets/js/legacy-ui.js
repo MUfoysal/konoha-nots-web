@@ -53,7 +53,7 @@ window.renderLucideIcons();
 var currentUser=null,notes=[],activeNoteId=null,activeFilter='all',deleteTargetId=null,isReadMode=false,autoSaveTimer=null;
 let notesLeaveGuardActive=false,notesLeaveGuardBypass=false;
 let _authAnimActive=false,_authRaf=null;
-let navScrollFrame=0,notesAppBarTimer=null,notesAppBarEnabled=false;
+let navScrollFrame=0;
 
 function updateActiveNavigation(){
   const navItems=document.querySelectorAll('#nav [data-nav-view],#nav [data-nav-section],#mobileMenu [data-nav-view],#mobileMenu [data-nav-section]');
@@ -93,86 +93,19 @@ function handleAppBarScroll(){
   });
 }
 
-function isNotesDesktopView(){
-  return document.getElementById('view-notes')?.classList.contains('active')&&window.matchMedia('(min-width: 1024px)').matches;
-}
-
-function setNotesAppBarHidden(hidden){
+window.syncNotesAppBarBehavior=function(){
   const nav=document.getElementById('nav');
   const notesView=document.getElementById('view-notes');
   if(!nav||!notesView)return;
-  nav.classList.toggle('nav-hidden',hidden);
-  notesView.classList.toggle('notes-space-expanded',hidden);
-}
-
-function clearNotesAppBarTimer(){
-  if(notesAppBarTimer){window.clearTimeout(notesAppBarTimer);notesAppBarTimer=null}
-}
-
-function scheduleNotesAppBarHide(){
-  clearNotesAppBarTimer();
-  if(!notesAppBarEnabled)return;
-  const nav=document.getElementById('nav');
-  if(nav?.matches(':hover')||nav?.contains(document.activeElement))return;
-  notesAppBarTimer=window.setTimeout(()=>{
-    notesAppBarTimer=null;
-    if(notesAppBarEnabled&&!nav?.matches(':hover')&&!nav?.contains(document.activeElement))setNotesAppBarHidden(true);
-  },3500);
-}
-
-function handleNotesPageActivity(){
-  if(!notesAppBarEnabled)return;
-  setNotesAppBarHidden(false);
-  scheduleNotesAppBarHide();
-}
-
-function handleNotesNavEnter(){clearNotesAppBarTimer();setNotesAppBarHidden(false)}
-function handleNotesNavLeave(){scheduleNotesAppBarHide()}
-function handleNotesNavFocusOut(event){if(!event.relatedTarget||!event.currentTarget.contains(event.relatedTarget))scheduleNotesAppBarHide()}
-
-function cleanupNotesAppBarBehavior(){
-  clearNotesAppBarTimer();
-  if(!notesAppBarEnabled)return;
-  const nav=document.getElementById('nav');
-  window.removeEventListener('mousemove',handleNotesPageActivity);
-  window.removeEventListener('pointerdown',handleNotesPageActivity);
-  window.removeEventListener('keydown',handleNotesPageActivity);
-  window.removeEventListener('wheel',handleNotesPageActivity);
-  nav?.removeEventListener('mouseenter',handleNotesNavEnter);
-  nav?.removeEventListener('mouseleave',handleNotesNavLeave);
-  nav?.removeEventListener('focusin',handleNotesNavEnter);
-  nav?.removeEventListener('focusout',handleNotesNavFocusOut);
-  nav?.classList.remove('notes-auto-hide');
-  document.getElementById('view-notes')?.classList.remove('notes-space-expanded');
-  notesAppBarEnabled=false;
-}
-
-function syncNotesAppBarBehavior(){
-  const nav=document.getElementById('nav');
-  if(!nav)return;
-  if(!isNotesDesktopView()){
-    cleanupNotesAppBarBehavior();
-    nav.classList.remove('nav-hidden');
-    return;
-  }
-  if(notesAppBarEnabled)return;
-  notesAppBarEnabled=true;
-  nav.classList.add('notes-auto-hide');
-  setNotesAppBarHidden(false);
-  window.addEventListener('mousemove',handleNotesPageActivity,{passive:true});
-  window.addEventListener('pointerdown',handleNotesPageActivity,{passive:true});
-  window.addEventListener('keydown',handleNotesPageActivity);
-  window.addEventListener('wheel',handleNotesPageActivity,{passive:true});
-  nav.addEventListener('mouseenter',handleNotesNavEnter);
-  nav.addEventListener('mouseleave',handleNotesNavLeave);
-  nav.addEventListener('focusin',handleNotesNavEnter);
-  nav.addEventListener('focusout',handleNotesNavFocusOut);
-  scheduleNotesAppBarHide();
-}
+  const notesActive=notesView.classList.contains('active');
+  const hideForMode=notesActive&&(notesView.classList.contains('focus-mode')||document.getElementById('editorBodyDiv')?.classList.contains('read-mode'));
+  nav.classList.toggle('notes-mode-hidden',hideForMode);
+  notesView.classList.toggle('notes-space-expanded',hideForMode);
+};
 
 window.addEventListener('scroll',handleAppBarScroll,{passive:true});
-window.addEventListener('resize',()=>{updateActiveNavigation();syncNotesAppBarBehavior()},{passive:true});
-document.addEventListener('DOMContentLoaded',()=>{updateActiveNavigation();syncNotesAppBarBehavior()},{once:true});
+window.addEventListener('resize',()=>{updateActiveNavigation();window.syncNotesAppBarBehavior()},{passive:true});
+document.addEventListener('DOMContentLoaded',()=>{updateActiveNavigation();window.syncNotesAppBarBehavior()},{once:true});
 
 // Clean up mobile drawer classes when resizing to desktop
 window.addEventListener('resize',()=>{
@@ -348,7 +281,7 @@ function showView(name,sub){
     if(name==='settings')window.loadSettingsPage?.();
     if(name==='home'){initHeroCanvas();initScrollObserver()}
     updateActiveNavigation();
-    syncNotesAppBarBehavior();
+    window.syncNotesAppBarBehavior();
 
     t.classList.remove('enter');t.classList.add('exit');
     setTimeout(()=>t.classList.remove('exit'),500);
@@ -481,7 +414,10 @@ function toggleArchiveSidebar(){
 function toggleFocusMode(){
   const view=document.getElementById('view-notes');if(!view)return;
   const enabled=view.classList.toggle('focus-mode');
-  document.getElementById('focusModeBtn')?.setAttribute('aria-pressed',String(enabled));
+  const focusButton=document.getElementById('focusModeBtn');
+  focusButton?.setAttribute('aria-pressed',String(enabled));
+  focusButton?.classList.toggle('active',enabled);
+  window.syncNotesAppBarBehavior();
   if(enabled)document.getElementById('note-content-editor')?.focus();
 }
 document.getElementById('notesList')?.addEventListener('keydown',event=>{
@@ -497,7 +433,10 @@ document.getElementById('notesList')?.addEventListener('keydown',event=>{
 window.addEventListener('keydown',event=>{
   const view=document.getElementById('view-notes');if(!view?.classList.contains('active'))return;
   const target=event.target;const typing=target instanceof HTMLElement&&(target.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(target.tagName));
-  if(event.key==='Escape'&&view.classList.contains('focus-mode')){event.preventDefault();toggleFocusMode();return}
+  if(event.key==='Escape'){
+    if(view.classList.contains('focus-mode')){event.preventDefault();toggleFocusMode();return}
+    if(window.isReadMode){event.preventDefault();window.toggleReadMode?.();return}
+  }
   if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
   if(event.key.toLowerCase()==='s'){event.preventDefault();void window.saveNote?.({manual:true});return}
   if(typing)return;
@@ -536,6 +475,38 @@ function fmtCode(){const sel=window.getSelection();if(sel&&sel.toString())docume
 function fmtLink(){const url=prompt('Enter URL:');if(url)document.execCommand('createLink',false,url)}
 function fmtRule(){document.execCommand('insertHTML',false,'<hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>')}
 function changeFont(){document.getElementById('note-content-editor').style.fontFamily=document.getElementById('fontSelect').value}
+function escapeEditorHtml(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
+function insertEditorHtml(html){const editor=document.getElementById('note-content-editor');if(!editor)return;editor.focus();document.execCommand('insertHTML',false,html);window.onContentChange?.()}
+function editorSelectionHtml(tag,attrs=''){const selection=window.getSelection();const text=selection?.toString()||'';return `<${tag}${attrs}>${escapeEditorHtml(text||'Write here…')}</${tag}>`}
+function insertEditorChecklist(){insertEditorHtml('<ul><li><input type="checkbox"> Task item</li><li><input type="checkbox"> Another task</li></ul><p><br></p>')}
+function insertEditorTable(){insertEditorHtml('<table><tbody><tr><th>Column 1</th><th>Column 2</th></tr><tr><td>Cell</td><td>Cell</td></tr><tr><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>')}
+function insertEditorCallout(){insertEditorHtml('<blockquote style="background-color:rgba(192,57,43,.12);border-left:3px solid #c0392b;padding:12px 16px">Callout: add an important note here.</blockquote><p><br></p>')}
+function insertEditorCodeBlock(){insertEditorHtml('<pre><code>const chakra = "focus";\nconsole.log(chakra);</code></pre><p><br></p>');highlightEditorCode()}
+function insertEditorToggle(){insertEditorHtml('<details open><summary>Click to expand</summary><p>Write the hidden details here.</p></details><p><br></p>')}
+function insertEditorLink(){const selection=window.getSelection();const selected=selection?.toString()||'';const href=prompt('Enter a web address (https://…)');if(!href)return;const safe=/^(https?:\/\/|mailto:)/i.test(href)?href:`https://${href}`;if(selected){insertEditorHtml(`<a href="${escapeEditorHtml(safe)}">${escapeEditorHtml(selected)}</a>`);return}let host=safe;try{host=new URL(safe).hostname}catch{}insertEditorHtml(`<blockquote><strong>${escapeEditorHtml(host)}</strong><br><a href="${escapeEditorHtml(safe)}">${escapeEditorHtml(safe)}</a></blockquote><p><br></p>`)}
+function highlightEditorCode(){const editor=document.getElementById('note-content-editor');if(!editor)return;editor.querySelectorAll('pre code').forEach(code=>{const raw=code.textContent||'';const tokens=raw.split(/(\/\/[^\n]*|#[^\n]*|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b(?:const|let|var|function|return|if|else|class|new|await|async|import|export|from|true|false|null)\b|\b\d+(?:\.\d+)?\b)/g);code.innerHTML=tokens.map(token=>{let color='';if(/^(\/\/|#)/.test(token))color='#8b927e';else if(/^['"]/.test(token))color='#d6a86c';else if(/^(const|let|var|function|return|if|else|class|new|await|async|import|export|from|true|false|null)$/.test(token))color='#e77c72';else if(/^\d/.test(token))color='#b59ae0';return color?`<span style="color:${color}">${escapeEditorHtml(token)}</span>`:escapeEditorHtml(token)}).join('')})}
+function openEditorSlashMenu(){const menu=document.getElementById('editorSlashMenu');if(!menu)return;const items=[['Heading 1','<h1>Heading</h1>'],['Bulleted list','<ul><li>List item</li></ul>'],['Checklist','<ul><li><input type="checkbox"> Task item</li></ul>'],['Table','<table><tbody><tr><th>Column 1</th><th>Column 2</th></tr><tr><td>Cell</td><td>Cell</td></tr></tbody></table>'],['Callout','<blockquote style="background-color:rgba(192,57,43,.12);border-left:3px solid #c0392b;padding:12px 16px">Callout text</blockquote>'],['Code block','<pre><code>Write code here</code></pre>'],['Toggle section','<details open><summary>Click to expand</summary><p>Hidden details</p></details>'],['Horizontal rule','<hr>']];menu.replaceChildren(...items.map(([label,html])=>{const button=document.createElement('button');button.type='button';button.role='menuitem';button.textContent=label;button.addEventListener('click',()=>{insertEditorHtml(html+'<p><br></p>');highlightEditorCode();menu.hidden=true});return button}));menu.hidden=false;menu.querySelector('button')?.focus()}
+async function insertEditorImage(file){if(!file?.type.startsWith('image/'))return;const image=new Image();const url=URL.createObjectURL(file);try{await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url});const scale=Math.min(1,900/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);let quality=.72,data=canvas.toDataURL('image/jpeg',quality);while(data.length>76000&&quality>.32){quality-=.08;data=canvas.toDataURL('image/jpeg',quality)}if(data.length>98000){showToast('This image is too large to fit in a scroll. Choose a smaller image.','error');return}insertEditorHtml(`<p><img src="${data}" alt="${escapeEditorHtml(file.name.replace(/\.[^.]+$/,''))}"/></p><p><br></p>`)}catch{showToast('Could not read that image file.','error')}finally{URL.revokeObjectURL(url)}}
+function enableEditorBlockReorder(){const editor=document.getElementById('note-content-editor');if(!editor)return;editor.querySelectorAll(':scope > p,:scope > h1,:scope > h2,:scope > h3,:scope > blockquote,:scope > pre,:scope > ul,:scope > ol,:scope > table,:scope > details').forEach(block=>{block.draggable=true;block.classList.add('editor-reorder-block')})}
+window.enableEditorBlockReorder=enableEditorBlockReorder;
+function setupRichEditor(){const editor=document.getElementById('note-content-editor');const bar=document.querySelector('#view-notes .format-bar');if(!editor||!bar)return;
+  bar.querySelectorAll('[data-editor-command]').forEach(button=>button.addEventListener('click',()=>{editor.focus();document.execCommand(button.dataset.editorCommand,false,null);window.onContentChange?.();refreshEditorToolbarState()}));
+  bar.addEventListener('mousedown',event=>{if(event.target.closest('button'))event.preventDefault()});
+  document.getElementById('editorTextColor')?.addEventListener('input',event=>{editor.focus();document.execCommand('foreColor',false,event.target.value);window.onContentChange?.()});
+  document.getElementById('editorHighlightColor')?.addEventListener('input',event=>{editor.focus();document.execCommand('hiliteColor',false,event.target.value);window.onContentChange?.()});
+  document.getElementById('editorBlockStyle')?.addEventListener('change',event=>{editor.focus();const value=event.target.value;if(['left','center','right'].includes(value))document.execCommand(`justify${value[0].toUpperCase()}${value.slice(1)}`,false,null);else document.execCommand('formatBlock',false,value);window.onContentChange?.()});
+  document.getElementById('editorChecklistButton')?.addEventListener('click',insertEditorChecklist);document.getElementById('editorTableButton')?.addEventListener('click',insertEditorTable);document.getElementById('editorCalloutButton')?.addEventListener('click',insertEditorCallout);document.getElementById('editorCodeBlockButton')?.addEventListener('click',insertEditorCodeBlock);document.getElementById('editorToggleButton')?.addEventListener('click',insertEditorToggle);document.getElementById('editorLinkButton')?.addEventListener('click',insertEditorLink);document.getElementById('editorRuleButton')?.addEventListener('click',()=>insertEditorHtml('<hr><p><br></p>'));document.getElementById('editorSlashButton')?.addEventListener('click',openEditorSlashMenu);
+  const fileInput=document.getElementById('editorImageInput');document.getElementById('editorImageButton')?.addEventListener('click',()=>fileInput?.click());fileInput?.addEventListener('change',()=>{void insertEditorImage(fileInput.files?.[0]);fileInput.value=''});
+  editor.addEventListener('keyup',refreshEditorToolbarState);editor.addEventListener('mouseup',refreshEditorToolbarState);editor.addEventListener('input',enableEditorBlockReorder);
+  editor.addEventListener('change',event=>{if(event.target.matches('input[type="checkbox"]')){event.target.toggleAttribute('checked',event.target.checked);window.onContentChange?.()}});
+  editor.addEventListener('keydown',event=>{if(event.key==='Escape'){const menu=document.getElementById('editorSlashMenu');if(menu&&!menu.hidden){menu.hidden=true;editor.focus()}}if(event.key==='/'&&!window.getSelection()?.toString()){setTimeout(openEditorSlashMenu,0)}if(event.key===' ')applyEditorMarkdownShortcut(event);if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){setTimeout(refreshEditorToolbarState,0)}});
+  editor.addEventListener('dragstart',event=>{const block=event.target.closest('.editor-reorder-block');if(!block)return;event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain','konoha-editor-block');block.classList.add('is-dragging')});
+  editor.addEventListener('dragend',event=>event.target.closest('.editor-reorder-block')?.classList.remove('is-dragging'));
+  editor.addEventListener('dragover',event=>{const dragged=editor.querySelector('.is-dragging'),target=event.target.closest('.editor-reorder-block');if(!dragged||!target||dragged===target)return;event.preventDefault();const rect=target.getBoundingClientRect();editor.insertBefore(dragged,event.clientY<rect.top+rect.height/2?target:target.nextSibling)});
+}
+function refreshEditorToolbarState(){document.querySelectorAll('#view-notes [data-editor-command]').forEach(button=>{const command=button.dataset.editorCommand;const active=['bold','italic','underline','strikeThrough','subscript','superscript','insertUnorderedList','insertOrderedList'].includes(command)&&document.queryCommandState(command);button.classList.toggle('active',Boolean(active));button.setAttribute('aria-pressed',String(Boolean(active)))})}
+function applyEditorMarkdownShortcut(event){if(event.key!==' ')return;const selection=window.getSelection();const node=selection?.anchorNode;if(!node||node.nodeType!==Node.TEXT_NODE)return;const before=node.textContent.slice(0,selection.anchorOffset);const inline=[[/\*\*(.+)\*\*$/,'strong'],[/__(.+)__$/,'strong'],[/\*(.+)\*$/,'em'],[/_(.+)_$/,'em'],[/~~(.+)~~$/,'del'],[/`([^`]+)`$/,'code']];for(const [pattern,tag] of inline){const match=before.match(pattern);if(!match)continue;event.preventDefault();const range=document.createRange();range.setStart(node,selection.anchorOffset-match[0].length);range.setEnd(node,selection.anchorOffset);range.deleteContents();const el=document.createElement(tag);el.textContent=match[1];range.insertNode(el);range.setStartAfter(el);range.collapse(true);selection.removeAllRanges();selection.addRange(range);window.onContentChange?.();return}const block=before.match(/^(#{1,3}|>|[-*]|\d+\.|\[ \])$/);if(!block)return;const marker=block[1],tag=marker.startsWith('#')?`h${marker.length}`:marker==='>'?'blockquote':marker==='[ ]'?'li':marker.match(/^\d/)?'ol':'ul';event.preventDefault();const range=document.createRange();range.setStart(node,selection.anchorOffset-marker.length);range.setEnd(node,selection.anchorOffset);range.deleteContents();selection.removeAllRanges();selection.addRange(range);if(tag==='ol'||tag==='ul')document.execCommand(tag==='ol'?'insertOrderedList':'insertUnorderedList',false,null);else document.execCommand('formatBlock',false,tag);window.onContentChange?.()}
+setupRichEditor();
 function handleEditorKey(e){if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();window.saveNote?.({manual:true})}}
 function updateWordCount(){
   const text=document.getElementById('note-content-editor').innerText||'';
@@ -1207,14 +1178,8 @@ function updateProfileData(){
   document.getElementById('profileName').textContent=currentUser.name||currentUser.username||'Shinobi';
   const username=currentUser.username||'shinobi';
   const verification=currentUser.emailVerified?'Verified':'Not verified';
-  const accountUsername=document.getElementById('profileAccountUsername');
-  const accountEmail=document.getElementById('profileAccountEmail');
-  const accountVerification=document.getElementById('profileAccountVerification');
   const profileUsername=document.getElementById('profileUsernameText');
   const profileVerification=document.getElementById('profileVerificationText');
-  if(accountUsername)accountUsername.textContent='@'+username;
-  if(accountEmail)accountEmail.textContent=currentUser.email||'No email set';
-  if(accountVerification)accountVerification.textContent=verification;
   if(profileUsername)profileUsername.textContent='@'+username;
   if(profileVerification)profileVerification.textContent='Email '+verification.toLowerCase();
   const clan=currentUser.clan&&currentUser.clan!=='Independent'?'— '+currentUser.clan+' Clan —':'— Independent —';
@@ -1225,13 +1190,47 @@ function updateProfileData(){
   const avatarColors=['#C0392B','#8B0000','#FF4500','#E74C3C','#D35400'];
   const color=avatarColors[initial.charCodeAt(0)%avatarColors.length];
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><radialGradient id="av" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${color}" stop-opacity="0.8"/><stop offset="100%" stop-color="#0A0A0E"/></radialGradient></defs><circle cx="100" cy="100" r="95" fill="url(#av)"/><circle cx="100" cy="100" r="90" fill="none" stroke="${color}" stroke-width="2" opacity="0.5"/><text x="100" y="125" text-anchor="middle" font-size="80" fill="#fff" font-family="Cinzel,serif" font-weight="900" opacity="0.9">${initial}</text></svg>`;
-  document.getElementById('profileAvatar').src='data:image/svg+xml;base64,'+btoa(svg);
+  const profileAvatar=document.getElementById('profileAvatar');
+  const generatedAvatar='data:image/svg+xml;base64,'+btoa(svg);
+  profileAvatar.onerror=()=>{profileAvatar.onerror=null;profileAvatar.style.objectPosition='50% 50%';profileAvatar.style.transform='scale(1)';profileAvatar.src=generatedAvatar};
+  const avatarChoice=typeof currentUser.avatar==='string'?currentUser.avatar.match(/^konoha-avatar:v1:([a-z0-9-]+\.webp)\|(\d+(?:\.\d{1,2})?)\|(\d{1,3})\|(\d{1,3})$/):null;
+  if(avatarChoice){
+    const zoom=Number(avatarChoice[2]),x=Number(avatarChoice[3]),y=Number(avatarChoice[4]);
+    if(zoom>=1&&zoom<=2.5&&x<=100&&y<=100){
+      profileAvatar.src='assets/images/avatars/naruto/optimized/'+avatarChoice[1];
+      profileAvatar.style.objectPosition=x+'% '+y+'%';
+      const shiftX=((50-x)/50)*(zoom-1)*50,shiftY=((50-y)/50)*(zoom-1)*50;
+      profileAvatar.style.transform='translate('+shiftX+'%,'+shiftY+'%) scale('+zoom+')';
+    }else profileAvatar.src=generatedAvatar;
+  }else{
+    profileAvatar.src=currentUser.avatar||generatedAvatar;
+    profileAvatar.style.objectPosition='50% 50%';
+    profileAvatar.style.transform='scale(1)';
+  }
+  profileAvatar.alt=(currentUser.name||username)+' profile avatar';
+  const avatarResetButton=document.getElementById('profileAvatarResetButton');
+  if(avatarResetButton)avatarResetButton.hidden=!currentUser.avatar;
   const stats=window.getProfileStatistics(notes);
-  const {noteCount,rank,rankIcon,rankOrder,rankIndex:currentRankIdx,nextRank,rankProgress:progressToNext,pinnedCount,totalWords,tags:allTags,lastNote,notesThisWeek:thisWeek}=stats;
+  const {noteCount,rank,rankIcon,rankOrder,rankIndex:currentRankIdx,nextRank,rankProgress:progressToNext,notesToNextRank,pinnedCount,totalWords,tags:allTags,lastNote,notesThisWeek:thisWeek}=stats;
   const rankIconName=['rank-seal','rank-seal','chakra','flame-seal','ninja','clan-mark'][currentRankIdx]||'rank-seal';
   document.getElementById('profileRank').innerHTML=window.shinobiIcon(rankIconName)+' '+rank+' Rank';
+  const normalizedClan=String(currentUser.clan||'').trim().toLowerCase();
+  const clanEmblems=[['uchiha','flame-seal'],['uzumaki','spiral-seal'],['senju','leaf-mark'],['hyuga','chakra-focus']];
+  const clanEmblem=clanEmblems.find(([clanName])=>normalizedClan.includes(clanName));
+  const emblemIconName=clanEmblem?.[1]||rankIconName;
+  const emblemClanLabel=normalizedClan&&normalizedClan!=='independent'?currentUser.clan+' Clan':'Hidden Leaf';
+  const emblemMark=document.getElementById('profileInsigniaMark');
+  if(emblemMark){
+    emblemMark.innerHTML=window.shinobiIcon(emblemIconName);
+    emblemMark.style.setProperty('--rank-progress',(nextRank?progressToNext:100)+'%');
+    emblemMark.setAttribute('aria-label',emblemClanLabel+' emblem; '+rank+' rank; '+(nextRank?progressToNext+'% progress, '+notesToNextRank+' more '+(notesToNextRank===1?'scroll':'scrolls')+' to '+nextRank:'maximum rank'));
+  }
+  const emblemClan=document.getElementById('profileEmblemClan');
+  if(emblemClan)emblemClan.textContent=emblemClanLabel;
+  const emblemRank=document.getElementById('profileEmblemRank');
+  if(emblemRank)emblemRank.textContent=rank+' Rank Seal';
   document.getElementById('statRank').textContent=rank;
-  document.getElementById('statRankChange').textContent=nextRank?progressToNext+'% to '+nextRank:'Maximum rank';
+  document.getElementById('statRankChange').textContent=nextRank?notesToNextRank+' more '+(notesToNextRank===1?'scroll':'scrolls')+' to '+nextRank:'Maximum rank';
   document.getElementById('statNotes').textContent=noteCount;
   document.getElementById('statPinned').textContent=pinnedCount;
   document.getElementById('statPinnedChange').textContent=pinnedCount>0?pinnedCount+' priority scrolls':'No pinned scrolls';
@@ -1252,6 +1251,15 @@ function updateProfileData(){
     if(idx<currentRankIdx)node.classList.add('completed');
     else if(idx===currentRankIdx)node.classList.add('active');
   });
+  const path=document.getElementById('shinobiPath');
+  if(path){
+    const totalRanks=rankOrder.length;
+    const pathProgress=nextRank?((currentRankIdx+progressToNext/100)/(totalRanks-1))*100:100;
+    path.style.setProperty('--rank-track-progress',Math.min(pathProgress,100)+'%');
+    path.setAttribute('aria-label',rank+' rank, '+(nextRank?progressToNext+' percent progress toward '+nextRank:'highest rank achieved'));
+    const stage=document.getElementById('profilePathStage');
+    if(stage)stage.textContent='RANK '+String(currentRankIdx+1).padStart(2,'0')+' / '+String(totalRanks).padStart(2,'0');
+  }
 
   /* === Chakra Meters === */
   const maxNotes=50,maxPinned=10,maxWords=5000,maxTags=15;

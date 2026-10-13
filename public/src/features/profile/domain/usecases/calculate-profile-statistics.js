@@ -18,6 +18,7 @@ export function calculateProfileStatistics(notes, now = Date.now()) {
     noteCount, pinnedCount, totalWords, tags, lastNote, rankIndex, rank: rankNames[rankIndex],
     rankIcon: ['graduation-cap', 'shield', 'zap', 'flame', 'venetian-mask', 'crown'][rankIndex], rankProgress, rankOrder,
     nextRank: rankOrder[rankIndex + 1] || null,
+    notesToNextRank: nextThreshold ? nextThreshold - noteCount : 0,
     notesThisWeek: notes.filter(note => note.createdAt > now - 7 * 24 * 60 * 60 * 1000).length,
   };
 }

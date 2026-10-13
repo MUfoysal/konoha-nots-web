@@ -594,9 +594,9 @@ The original PHP/MySQL backend remains in the repository as rollback/reference m
 
 The active Firebase frontend no longer calls the PHP API.
 
-### Firebase Storage / Cloud Functions
+### Profile Photos / Cloud Functions
 
-Firebase Storage and Cloud Functions are not currently used because the application has no upload functionality or trusted server-only workflow.
+Users choose from the Naruto portraits bundled with the site. Firestore stores only the selected portrait name and crop settings in the owner's profile, so the choice follows the account across devices without uploading image data to Firebase. Cloud Storage and Cloud Functions are not used.
 
 ### Mobile Screenshots
 

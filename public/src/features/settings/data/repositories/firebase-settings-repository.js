@@ -6,6 +6,8 @@ export class FirebaseSettingsRepository extends SettingsRepository {
   getCapabilities() { return this.dataSource.getCapabilities(); }
   refreshAccount() { return this.dataSource.refreshAccount(); }
   updateProfile(input) { return this.dataSource.updateProfile(input); }
+  selectAvatar(choice) { return this.dataSource.selectAvatar(choice); }
+  removeAvatar() { return this.dataSource.removeAvatar(); }
   changePassword(input) { return this.dataSource.changePassword(input); }
   requestEmailChange(email, password) { return this.dataSource.requestEmailChange(email, password); }
 }

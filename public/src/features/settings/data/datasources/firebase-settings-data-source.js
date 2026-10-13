@@ -1,6 +1,6 @@
 import { EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, reload, updatePassword, updateProfile, verifyBeforeUpdateEmail } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { doc, getDoc, serverTimestamp, updateDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { userFromAuth } from '../../../auth/domain/entities/user.js';
+import { userFromAuth } from '../../../auth/domain/entities/user.js?v=20261013-2';
 
 function noUserError() {
   return Object.assign(new Error('Your sign-in session expired. Sign in again to continue.'), { code: 'konoha/no-current-user' });
@@ -54,6 +54,40 @@ export class FirebaseSettingsDataSource {
       throw error;
     }
     return { ...snapshot.data(), displayName, clan };
+  }
+
+  async selectAvatar({ filename, zoom = 1, x = 50, y = 50 }) {
+    if (typeof filename !== 'string' || !/^[a-z0-9-]+\.webp$/.test(filename)) {
+      throw Object.assign(new Error('Choose an avatar from the gallery.'), { name: 'KonohaInputError' });
+    }
+    const safeZoom = Math.min(2.5, Math.max(1, Number(zoom) || 1));
+    const safeX = Math.round(Math.min(100, Math.max(0, Number(x) || 0)));
+    const safeY = Math.round(Math.min(100, Math.max(0, Number(y) || 0)));
+    const photoURL = `konoha-avatar:v1:${filename}|${safeZoom.toFixed(2)}|${safeX}|${safeY}`;
+    const user = this.currentUser();
+    const profileRef = doc(this.db, 'users', user.uid);
+    const snapshot = await getDoc(profileRef);
+    if (!snapshot.exists()) throw Object.assign(new Error('Your profile could not be found. Sign out and sign in again.'), { code: 'konoha/profile-not-found' });
+
+    try {
+      await updateDoc(profileRef, { photoURL, updatedAt: serverTimestamp() });
+      return photoURL;
+    } catch (error) {
+      if (error?.name === 'KonohaInputError' || error?.code?.startsWith('konoha/')) throw error;
+      throw Object.assign(new Error(error?.message || 'The profile photo could not be saved.'), {
+        code: error?.code || 'profile-photo/unknown',
+        profilePhotoStage: 'saving the avatar choice to your Firestore profile',
+        cause: error,
+      });
+    }
+  }
+
+  async removeAvatar() {
+    const user = this.currentUser();
+    const profileRef = doc(this.db, 'users', user.uid);
+    const snapshot = await getDoc(profileRef);
+    if (!snapshot.exists()) throw Object.assign(new Error('Your profile could not be found. Sign out and sign in again.'), { code: 'konoha/profile-not-found' });
+    await updateDoc(profileRef, { photoURL: null, updatedAt: serverTimestamp() });
   }
 
   async reauthenticate(user, currentPassword = '') {

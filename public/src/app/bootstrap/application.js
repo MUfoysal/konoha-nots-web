@@ -6,12 +6,13 @@ import { AuthController } from '../../features/auth/presentation/controllers/aut
 import { FirestoreNotesDataSource } from '../../features/notes/data/datasources/firestore-notes-data-source.js';
 import { FirestoreNotesRepository } from '../../features/notes/data/repositories/firestore-notes-repository.js';
 import { NotesController } from '../../features/notes/presentation/controllers/notes-controller.js';
-import { sanitizeNoteHtml } from '../../core/utils/sanitize-note-html.js';
+import { sanitizeNoteHtml } from '../../core/utils/sanitize-note-html.js?v=20261013-1';
 import { calculateProfileStatistics } from '../../features/profile/domain/usecases/calculate-profile-statistics.js';
 import { filterAndSortNotes } from '../../features/notes/domain/usecases/filter-and-sort-notes.js';
-import { FirebaseSettingsDataSource } from '../../features/settings/data/datasources/firebase-settings-data-source.js';
+import { FirebaseSettingsDataSource } from '../../features/settings/data/datasources/firebase-settings-data-source.js?v=20261013-2';
 import { FirebaseSettingsRepository } from '../../features/settings/data/repositories/firebase-settings-repository.js';
 import { SettingsController } from '../../features/settings/presentation/controllers/settings-controller.js';
+import { SHINOBI_AVATARS, parseShinobiAvatar } from '../../features/settings/presentation/avatar-catalog.js?v=20261013-1';
 
 let deleteModalTrigger = null;
 let authController;
@@ -290,12 +291,16 @@ window.openNote = async id => {
   if (byId('editorEmpty')) byId('editorEmpty').style.display = 'none';
   const active = byId('editorActive'); if (active) { active.style.display = 'flex'; active.style.flexDirection = 'column'; active.style.height = '100%'; }
   if (byId('noteTitleInput')) byId('noteTitleInput').value = note.title;
-  if (byId('note-content-editor')) byId('note-content-editor').innerHTML = sanitizeNoteHtml(note.content || '');
+  if (byId('note-content-editor')) {
+    byId('note-content-editor').innerHTML = sanitizeNoteHtml(note.content || '');
+    window.enableEditorBlockReorder?.();
+  }
   window.renderTags?.(note.tags || []); window.updatePinBtn?.(note.pinned); window.updateReadBtn?.(); window.updateWordCount?.();
   const savedLabel = Number.isFinite(note.updatedAt) && note.updatedAt > 0 ? `Sealed: ${new Date(note.updatedAt).toLocaleTimeString()}` : 'Saved';
   window.setNoteSaveStatus?.('saved', savedLabel);
   document.querySelectorAll('.note-item').forEach(element => element.classList.toggle('active', element.dataset.id === String(id)));
   byId('editorBodyDiv')?.classList.remove('read-mode'); if (byId('note-content-editor')) byId('note-content-editor').contentEditable = 'true';
+  window.syncNotesAppBarBehavior?.();
   const formatBar = document.querySelector('.format-bar'); const tags = document.querySelector('.editor-tags');
   if (formatBar) formatBar.style.display = ''; if (tags) tags.style.display = '';
   if (window.innerWidth <= 1023) {
@@ -318,6 +323,7 @@ window.toggleReadMode = () => {
   if (byId('note-content-editor')) byId('note-content-editor').contentEditable = String(!window.isReadMode);
   const bar = document.querySelector('.format-bar'); const tags = document.querySelector('.editor-tags');
   if (bar) bar.style.display = window.isReadMode ? 'none' : ''; if (tags) tags.style.display = window.isReadMode ? 'none' : '';
+  window.syncNotesAppBarBehavior?.();
   if (window.isReadMode) void window.saveNote(); window.updateReadBtn();
 };
 
@@ -437,6 +443,27 @@ function scheduleActiveNoteSave() {
 
 window.updateNoteTitle = () => scheduleActiveNoteSave();
 window.onContentChange = () => { window.updateWordCount?.(); scheduleActiveNoteSave(); };
+byId('note-content-editor')?.addEventListener('paste', event => {
+  const clipboard = event.clipboardData;
+  if (!clipboard) return;
+  event.preventDefault();
+
+  let pastedHtml = clipboard.getData('text/html');
+  if (pastedHtml) {
+    const parsed = new DOMParser().parseFromString(pastedHtml, 'text/html');
+    parsed.querySelectorAll('script,style,meta,link,iframe,object,embed').forEach(node => node.remove());
+    pastedHtml = sanitizeNoteHtml(parsed.body.innerHTML);
+  } else {
+    const plainText = clipboard.getData('text/plain');
+    const textNode = document.createElement('div');
+    textNode.textContent = plainText;
+    pastedHtml = textNode.innerHTML.replace(/\r\n?|\n/g, '<br>');
+  }
+
+  if (!pastedHtml) return;
+  document.execCommand('insertHTML', false, pastedHtml);
+  window.onContentChange();
+});
 window.togglePin = async () => {
   const note = window.notes.find(item => String(item.id) === String(window.activeNoteId)); if (!note) return;
   note.pinned = !note.pinned; markNoteDirty(note); window.updatePinBtn?.(note.pinned);
@@ -622,6 +649,153 @@ document.addEventListener('DOMContentLoaded', () => {
         reportError('update profile', error);
         setSettingsFeedback('settingsProfileFeedback', userMessage(error), 'error');
       } finally { setSettingsBusy(button, false); }
+    });
+    const avatarChooseButton = byId('profileAvatarChooseButton');
+    const avatarResetButton = byId('profileAvatarResetButton');
+    const avatarPicker = byId('profileAvatarPicker');
+    const avatarPickerClose = byId('profileAvatarPickerClose');
+    const avatarGalleryView = byId('profileAvatarGalleryView');
+    const avatarCropView = byId('profileAvatarCropView');
+    const avatarGrid = byId('profileAvatarGrid');
+    const avatarCropPreview = byId('profileAvatarCropPreview');
+    const avatarCropImage = byId('profileAvatarCropImage');
+    const avatarZoom = byId('profileAvatarZoom');
+    const avatarPositionX = byId('profileAvatarPositionX');
+    const avatarPositionY = byId('profileAvatarPositionY');
+    const avatarApplyButton = byId('profileAvatarApply');
+    let selectedAvatar = null;
+
+    const setCropValues = (zoom, x, y) => {
+      avatarZoom.value = String(zoom);
+      avatarPositionX.value = String(x);
+      avatarPositionY.value = String(y);
+      byId('profileAvatarZoomValue').textContent = `${Number(zoom).toFixed(2)}×`;
+      byId('profileAvatarPositionXValue').textContent = `${Math.round(x)}%`;
+      byId('profileAvatarPositionYValue').textContent = `${Math.round(y)}%`;
+      avatarCropImage.style.objectPosition = `${x}% ${y}%`;
+      const shiftX = ((50 - x) / 50) * (zoom - 1) * 50;
+      const shiftY = ((50 - y) / 50) * (zoom - 1) * 50;
+      avatarCropImage.style.transform = `translate(${shiftX}%, ${shiftY}%) scale(${zoom})`;
+    };
+
+    const renderAvatarGrid = () => {
+      if (avatarGrid.childElementCount) return;
+      const fragment = document.createDocumentFragment();
+      SHINOBI_AVATARS.forEach(avatar => {
+        const choice = document.createElement('button');
+        choice.type = 'button';
+        choice.className = 'profile-avatar-choice';
+        choice.dataset.avatarFilename = avatar.filename;
+        choice.setAttribute('aria-label', `Adjust ${avatar.label} avatar`);
+        const image = document.createElement('img');
+        image.src = avatar.src;
+        image.alt = '';
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        const label = document.createElement('span');
+        label.textContent = avatar.label;
+        choice.append(image, label);
+        fragment.append(choice);
+      });
+      avatarGrid.append(fragment);
+    };
+
+    avatarChooseButton?.addEventListener('click', () => {
+      renderAvatarGrid();
+      avatarGalleryView.hidden = false;
+      avatarCropView.hidden = true;
+      setSettingsFeedback('profileAvatarPickerFeedback', '');
+      avatarPicker.showModal();
+      avatarPickerClose.focus();
+    });
+    avatarPickerClose?.addEventListener('click', () => avatarPicker.close());
+    avatarPicker?.addEventListener('click', event => {
+      if (event.target === avatarPicker) avatarPicker.close();
+    });
+    avatarGrid?.addEventListener('click', event => {
+      const choice = event.target.closest('[data-avatar-filename]');
+      if (!choice) return;
+      selectedAvatar = SHINOBI_AVATARS.find(avatar => avatar.filename === choice.dataset.avatarFilename);
+      if (!selectedAvatar) return;
+      const previous = parseShinobiAvatar(lastUser?.avatar);
+      avatarCropImage.src = selectedAvatar.src;
+      avatarCropImage.alt = `${selectedAvatar.label} crop preview`;
+      setCropValues(previous?.filename === selectedAvatar.filename ? previous.zoom : 1,
+        previous?.filename === selectedAvatar.filename ? previous.x : 50,
+        previous?.filename === selectedAvatar.filename ? previous.y : 50);
+      avatarGalleryView.hidden = true;
+      avatarCropView.hidden = false;
+      setSettingsFeedback('profileAvatarPickerFeedback', '');
+      byId('profileAvatarZoom').focus();
+    });
+    byId('profileAvatarBack')?.addEventListener('click', () => {
+      avatarGalleryView.hidden = false;
+      avatarCropView.hidden = true;
+      setSettingsFeedback('profileAvatarPickerFeedback', '');
+    });
+    [avatarZoom, avatarPositionX, avatarPositionY].forEach(control => control?.addEventListener('input', () => {
+      setCropValues(Number(avatarZoom.value), Number(avatarPositionX.value), Number(avatarPositionY.value));
+    }));
+
+    let cropDrag = null;
+    avatarCropPreview?.addEventListener('pointerdown', event => {
+      if (!selectedAvatar) return;
+      const bounds = avatarCropPreview.getBoundingClientRect();
+      cropDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, startX: Number(avatarPositionX.value), startY: Number(avatarPositionY.value), width: bounds.width, height: bounds.height };
+      avatarCropPreview.setPointerCapture(event.pointerId);
+    });
+    avatarCropPreview?.addEventListener('pointermove', event => {
+      if (!cropDrag || cropDrag.pointerId !== event.pointerId) return;
+      const x = Math.min(100, Math.max(0, cropDrag.startX - ((event.clientX - cropDrag.x) / cropDrag.width) * 100));
+      const y = Math.min(100, Math.max(0, cropDrag.startY - ((event.clientY - cropDrag.y) / cropDrag.height) * 100));
+      setCropValues(Number(avatarZoom.value), x, y);
+    });
+    const endCropDrag = event => { if (cropDrag?.pointerId === event.pointerId) cropDrag = null; };
+    avatarCropPreview?.addEventListener('pointerup', endCropDrag);
+    avatarCropPreview?.addEventListener('pointercancel', endCropDrag);
+
+    avatarApplyButton?.addEventListener('click', async () => {
+      if (!selectedAvatar) return;
+      setSettingsFeedback('profileAvatarPickerFeedback', 'Saving portrait selection…');
+      setSettingsBusy(avatarApplyButton, true, 'Saving…');
+      if (avatarResetButton) avatarResetButton.disabled = true;
+      try {
+        const avatar = await settingsController.selectAvatar({
+          filename: selectedAvatar.filename,
+          zoom: Number(avatarZoom.value),
+          x: Number(avatarPositionX.value),
+          y: Number(avatarPositionY.value),
+        });
+        setAuthState('authenticated', { ...lastUser, avatar });
+        window.updateProfileData?.();
+        avatarPicker.close();
+        setSettingsFeedback('profileAvatarFeedback', 'Profile portrait updated.', 'success');
+      } catch (error) {
+        reportError('save profile avatar choice', error);
+        const code = error?.code ? ` Error: ${error.code}.` : '';
+        setSettingsFeedback('profileAvatarPickerFeedback', `${userMessage(error)}${code}`, 'error');
+      } finally {
+        setSettingsBusy(avatarApplyButton, false);
+        if (avatarResetButton) avatarResetButton.disabled = false;
+      }
+    });
+
+    avatarResetButton?.addEventListener('click', async () => {
+      setSettingsFeedback('profileAvatarFeedback', 'Restoring generated avatar…');
+      setSettingsBusy(avatarResetButton, true, 'Restoring…');
+      if (avatarChooseButton) avatarChooseButton.disabled = true;
+      try {
+        await settingsController.removeAvatar();
+        setAuthState('authenticated', { ...lastUser, avatar: null });
+        window.updateProfileData?.();
+        setSettingsFeedback('profileAvatarFeedback', 'Generated avatar restored.', 'success');
+      } catch (error) {
+        reportError('remove profile photo', error);
+        setSettingsFeedback('profileAvatarFeedback', userMessage(error), 'error');
+      } finally {
+        setSettingsBusy(avatarResetButton, false);
+        if (avatarChooseButton) avatarChooseButton.disabled = false;
+      }
     });
     byId('settingsChangePasswordButton')?.addEventListener('click', async event => {
       const button = event.currentTarget;
