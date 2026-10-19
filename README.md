@@ -4,7 +4,7 @@ A Naruto-themed personal notes application built around a custom cinematic inter
 
 The application uses plain HTML, CSS, and modular JavaScript without a UI framework or application server. The original visual design is preserved while the application logic has been organized around a feature-based architecture.
 
-> **Project Status:** Local development and the main application flows have been verified. Unit tests, Firestore Security Rules emulator tests, JavaScript syntax checks, and browser smoke testing are passing. Production Firebase Hosting deployment is not yet verified.
+> **Project Status:** Unit tests, Firestore Security Rules emulator tests, and JavaScript syntax checks have passed locally. A complete browser acceptance flow and production Firebase Hosting deployment have not been verified in the latest QA cycle.
 
 ---
 
@@ -31,11 +31,20 @@ The application uses plain HTML, CSS, and modular JavaScript without a UI framew
 * Edit notes
 * Delete notes
 * Rich-text note content
+* Formatting toolbar with headings, lists, text and highlight colors, alignment, strikethrough, subscript, and superscript
+* Checklists, tables, callouts, collapsible sections, and horizontal rules
+* Code blocks with lightweight syntax highlighting
+* Slash-command menu and Markdown formatting shortcuts
+* Insert images, links, and simple link cards into a scroll
+* Undo/redo and drag-and-drop block reordering
 * Tags
 * Pin/unpin notes
+* Read mode and distraction-reducing focus mode
 * Search
 * Pinned/recent filters
 * Pinned-first/recent sorting
+* Quick Snippets for reusable text; snippets are saved in the current browser, can be copied or removed, and are not synced to the account
+* Local recovery drafts for unsaved note changes when browser storage is available
 * Persistent Firestore storage
 * User-specific note isolation
 
@@ -44,6 +53,7 @@ The application uses plain HTML, CSS, and modular JavaScript without a UI framew
 * Firebase user information
 * Username
 * Clan information
+* Selectable Naruto portrait gallery with adjustable zoom and crop position
 * Profile statistics
 * Note-derived activity information
 
@@ -52,8 +62,9 @@ The application uses plain HTML, CSS, and modular JavaScript without a UI framew
 * Account management
 * Authentication-related actions
 * Password reset
+* Email verification and password management
+* Profile portrait selection and crop controls
 * Logout
-* Application management
 
 ### 🛡️ Security
 
@@ -72,79 +83,58 @@ The application uses plain HTML, CSS, and modular JavaScript without a UI framew
 
 ## 🖥️ Screenshots
 
-The following screenshots were captured from the current Konoha Notes application.
-
-### Home
+Recent captures from the Konoha Notes application:
 
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="documentation/screenshots/homehero.png" width="100%" alt="Konoha Notes — Home Hero and Navigation">
+      <img src="documentation/screenshots/home-current.png" width="100%" alt="Konoha Notes — Home page">
       <br><br>
-      <strong>Hero & Navigation</strong>
+      <strong>Home</strong>
     </td>
     <td width="50%" align="center">
-      <img src="documentation/screenshots/features.png" width="100%" alt="Konoha Notes — Features Section">
+      <img src="documentation/screenshots/features-current.png" width="100%" alt="Konoha Notes — Feature cards">
       <br><br>
       <strong>Features</strong>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="documentation/screenshots/clans.png" width="100%" alt="Konoha Notes — Clans Section">
+      <img src="documentation/screenshots/notes-editor.png" width="100%" alt="Konoha Notes — Rich text note editor">
       <br><br>
-      <strong>Clans</strong>
+      <strong>Notes Editor</strong>
     </td>
     <td width="50%" align="center">
-      <img src="documentation/screenshots/shinobi.png" width="100%" alt="Konoha Notes — Shinobi Section">
+      <img src="documentation/screenshots/notes-empty.png" width="100%" alt="Konoha Notes — Empty private scroll state">
       <br><br>
-      <strong>Shinobi / Story</strong>
-    </td>
-  </tr>
-</table>
-
-### Application
-
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="documentation/screenshots/myscrool.png" width="100%" alt="Konoha Notes — My Scroll">
-      <br><br>
-      <strong>My Scroll</strong>
-    </td>
-    <td width="50%" align="center">
-      <img src="documentation/screenshots/nots.png" width="100%" alt="Konoha Notes — Notes Dashboard">
-      <br><br>
-      <strong>Notes Dashboard</strong>
+      <strong>Empty Notes State</strong>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="documentation/screenshots/login.png" width="100%" alt="Konoha Notes — Login">
-      <br><br>
-      <strong>Login</strong>
-    </td>
-    <td width="50%" align="center">
-      <img src="documentation/screenshots/signin.png" width="100%" alt="Konoha Notes — Sign In and Registration">
-      <br><br>
-      <strong>Sign In / Registration</strong>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center">
-      <img src="documentation/screenshots/profile.png" width="100%" alt="Konoha Notes — Profile">
-      <br><br>
-      <strong>Profile</strong>
-    </td>
-    <td width="50%" align="center">
-      <img src="documentation/screenshots/settings.png" width="100%" alt="Konoha Notes — Settings">
+      <img src="documentation/screenshots/settings-current.png" width="100%" alt="Konoha Notes — Account settings">
       <br><br>
       <strong>Settings</strong>
     </td>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/profile-account.png" width="100%" alt="Konoha Notes — Profile account and statistics">
+      <br><br>
+      <strong>Profile Account and Statistics</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/login-current.png" width="100%" alt="Konoha Notes — Sign in page">
+      <br><br>
+      <strong>Sign In</strong>
+    </td>
+    <td width="50%" align="center">
+      <img src="documentation/screenshots/register-current.png" width="100%" alt="Konoha Notes — Registration page">
+      <br><br>
+      <strong>Register</strong>
+    </td>
   </tr>
 </table>
-
-> Mobile-specific screenshots can be added later when available.
 
 ---
 
@@ -218,6 +208,11 @@ konoha_nots/
 │       │   │   └── presentation/
 │       │   │
 │       │   ├── notes/
+│       │   │   ├── data/
+│       │   │   ├── domain/
+│       │   │   └── presentation/
+│       │   │
+│       │   ├── settings/
 │       │   │   ├── data/
 │       │   │   ├── domain/
 │       │   │   └── presentation/
@@ -387,17 +382,17 @@ Detailed security information is available in `documentation/security.md`.
 
 ## 🧪 Testing & QA
 
-The project has been locally tested across unit logic, Firestore Security Rules, JavaScript syntax, and browser behavior.
+The latest recorded local checks cover unit logic, Firestore Security Rules, and JavaScript syntax. The complete browser acceptance flow remains unverified.
 
 ### Test Results
 
 | Test                  | Result       |
 | --------------------- | ------------ |
-| Unit Tests            | ✅ 12/12 PASS |
-| Firestore Rules Tests | ✅ 7/7 PASS   |
+| Unit Tests            | ✅ 16/16 PASS |
+| Firestore Rules Tests | ✅ 8/8 PASS   |
 | JavaScript Syntax     | ✅ PASS       |
 | Git Diff Check        | ✅ PASS       |
-| Browser Smoke Test    | ✅ PASS       |
+| Full Browser Flow     | ⏳ Not fully verified |
 
 ### Unit Tests
 
@@ -409,6 +404,7 @@ The unit test suite covers:
 * Filtering
 * Sorting
 * Profile statistics
+* Settings validation and profile updates
 
 Run:
 
@@ -437,22 +433,7 @@ npm run test:rules
 
 ### Browser Verification
 
-The main browser flow was manually verified locally, including:
-
-* Guest navigation
-* Guest My Scroll access
-* Protected actions
-* Registration
-* Authentication
-* Notes creation
-* Notes editing
-* Notes deletion
-* Refresh persistence
-* My Scroll authenticated behavior
-* Profile
-* Settings
-* Logout
-* Private-route protection after logout
+A complete signed-in browser acceptance run has not been completed in the latest QA cycle. Passing unit and emulator tests do not verify the full browser flow, including note saves during navigation or refresh.
 
 ---
 
@@ -642,10 +623,10 @@ The legacy backend should only be removed after:
 | Notes CRUD               | ✅ Locally verified                |
 | Profile                  | ✅ Locally verified                |
 | Settings                 | ✅ Locally verified                |
-| Firestore Security Rules | ✅ 7/7 tests passing               |
-| Domain Tests             | ✅ 12/12 passing                   |
-| Browser Smoke Test       | ✅ Verified                        |
-| Firebase Emulator        | ✅ Verified                        |
+| Firestore Security Rules | ✅ 8/8 tests passing               |
+| Domain Tests             | ✅ 16/16 passing                   |
+| Browser Smoke Test       | ⏳ Full flow not verified         |
+| Firebase Emulator        | ✅ Rules tests verified           |
 | Firebase Hosting         | ⏳ Production verification pending |
 | Data Migration           | ⏳ Not implemented                 |
 | Mobile Documentation     | ⏳ Screenshots pending             |
