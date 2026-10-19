@@ -6,7 +6,7 @@ I built this project to practice frontend development, Firebase integration, app
 
 The application uses plain HTML, CSS, and modular JavaScript without a frontend framework.
 
-**Project status:** The project includes authentication, note management, a rich-text editor, profile settings, and Firestore integration. Unit tests and Firestore Security Rules tests pass locally. The complete browser save-and-reload workflow is still being verified.
+**Project status:** The project includes authentication, note management, a rich-text editor, profile settings, and Firestore integration. Unit tests and Firestore Security Rules tests pass locally. The user reports that note saving, navigation, and reload are now working; this latest browser result has not been independently reproduced in this QA cycle.
 
 ## ✨ Features
 
@@ -275,7 +275,7 @@ I use unit tests and Firebase Emulator Suite tests to check the application's lo
 | Firestore Security Rules tests | 8/8 passed |
 | JavaScript syntax checks | Passed |
 | `git diff --check` | Passed |
-| Complete browser acceptance flow | Not fully verified |
+| Note save/navigation/reload | User reports working; not independently reverified |
 | Production Hosting deployment | Not verified in the latest QA cycle |
 
 Run the unit tests:
@@ -292,9 +292,9 @@ npm run test:rules
 
 ### Current QA Limitation
 
-The complete signed-in browser workflow has not yet been verified end to end. In particular, note creation or editing followed by navigation, page reload, and confirmation of the latest cloud-saved content still requires testing.
+The user has confirmed that note saving, navigation, and reload are now working in their browser. This report has not been independently reproduced in the latest QA cycle; automated unit and Security Rules tests do not verify the complete signed-in browser flow.
 
-A guard for invalid note IDs such as `undefined` and `null` has been added with corresponding unit tests. However, the full browser save flow remains under investigation. Passing unit tests and Security Rules tests alone does not establish that every note-saving scenario works correctly.
+A guard for invalid note IDs such as `undefined` and `null` has been added with corresponding unit tests. The user reports the browser issue is resolved; independently reproducing all note-saving scenarios remains future QA work.
 
 ## 🚀 Local Development
 
@@ -393,7 +393,7 @@ Additional documentation is available in the `documentation/` directory:
 
 ## 🔮 Future Improvements
 
-- Complete the browser-based save, navigation, and reload tests.
+- Independently recheck save, navigation, and reload behavior across desktop, tablet, and mobile layouts.
 - Verify Firebase Hosting deployment and production authentication flows.
 - Improve recovery and save-failure handling based on test results.
 - Add pagination if the size of note collections requires it.
