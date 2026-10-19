@@ -1,14 +1,15 @@
 import { firebaseServices } from '../../core/services/firebase.js';
-import { userMessage, reportError } from '../../core/errors/app-error.js';
+import { userMessage, reportError } from '../../core/errors/app-error.js?v=20261019-7';
 import { FirebaseAuthDataSource } from '../../features/auth/data/datasources/firebase-auth-data-source.js';
 import { FirebaseAuthRepository } from '../../features/auth/data/repositories/firebase-auth-repository.js';
 import { AuthController } from '../../features/auth/presentation/controllers/auth-controller.js';
-import { FirestoreNotesDataSource } from '../../features/notes/data/datasources/firestore-notes-data-source.js';
+import { FirestoreNotesDataSource } from '../../features/notes/data/datasources/firestore-notes-data-source.js?v=20261020-1';
 import { FirestoreNotesRepository } from '../../features/notes/data/repositories/firestore-notes-repository.js';
-import { NotesController } from '../../features/notes/presentation/controllers/notes-controller.js';
+import { NotesController } from '../../features/notes/presentation/controllers/notes-controller.js?v=20261020-1';
 import { sanitizeNoteHtml } from '../../core/utils/sanitize-note-html.js?v=20261013-1';
 import { calculateProfileStatistics } from '../../features/profile/domain/usecases/calculate-profile-statistics.js';
 import { filterAndSortNotes } from '../../features/notes/domain/usecases/filter-and-sort-notes.js';
+import { MAX_NOTE_CONTENT_LENGTH, normalizeNoteId } from '../../features/notes/domain/entities/note.js?v=20261020-8';
 import { FirebaseSettingsDataSource } from '../../features/settings/data/datasources/firebase-settings-data-source.js?v=20261013-2';
 import { FirebaseSettingsRepository } from '../../features/settings/data/repositories/firebase-settings-repository.js';
 import { SettingsController } from '../../features/settings/presentation/controllers/settings-controller.js';
@@ -24,7 +25,30 @@ const noteRevisions = new Map();
 const savedNoteRevisions = new Map();
 const noteSaveTasks = new Map();
 const pendingNoteSaves = new Set();
+const localNoteDraftTimers = new Map();
+const MAX_RECOVERY_DRAFT_LENGTH = 700_000;
+let noteSaveFailureMessage = '';
+let activeNoteModel = null;
+let activeNoteOwnerUid = null;
+let noteCreateTask = null;
+const pendingNoteCreateIds = new Map();
 const noteDraftStorageKey = uid => `konoha-notes-drafts:v1:${uid}`;
+const pendingNoteCreateStorageKey = uid => `konoha-notes-pending-create:v1:${uid}`;
+function acquirePendingNoteCreate(uid) {
+  let id = pendingNoteCreateIds.get(uid);
+  let retry = Boolean(id);
+  if (!id) {
+    try { id = sessionStorage.getItem(pendingNoteCreateStorageKey(uid)); retry = Boolean(id); } catch {}
+  }
+  if (!id) id = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  pendingNoteCreateIds.set(uid, id);
+  try { sessionStorage.setItem(pendingNoteCreateStorageKey(uid), id); } catch {}
+  return { id, retry };
+}
+function clearPendingNoteCreate(uid) {
+  pendingNoteCreateIds.delete(uid);
+  try { sessionStorage.removeItem(pendingNoteCreateStorageKey(uid)); } catch {}
+}
 function readLocalNoteDrafts(uid) {
   if (!uid) return {};
   try {
@@ -36,13 +60,27 @@ function writeLocalNoteDraft(uid, note) {
   if (!uid || !note?.id) return false;
   try {
     const drafts = readLocalNoteDrafts(uid);
-    drafts[String(note.id)] = { title: note.title || 'Untitled', content: note.content || '', tags: Array.isArray(note.tags) ? note.tags : [], pinned: !!note.pinned, updatedAt: Date.now() };
+    drafts[String(note.id)] = { title: note.title || 'Untitled', content: note.content || '', tags: Array.isArray(note.tags) ? note.tags : [], pinned: !!note.pinned, baseUpdatedAt: Number.isFinite(Number(note.updatedAt)) ? Number(note.updatedAt) : null, updatedAt: Date.now() };
     localStorage.setItem(noteDraftStorageKey(uid), JSON.stringify(drafts));
     return true;
   } catch (error) {
     reportError('backup pending scroll locally', error);
     return false;
   }
+}
+function scheduleLocalNoteDraft(uid, note) {
+  if (!uid || !note?.id) return;
+  const id = String(note.id);
+  if (localNoteDraftTimers.has(id)) return;
+  localNoteDraftTimers.set(id, setTimeout(() => {
+    localNoteDraftTimers.delete(id);
+    writeLocalNoteDraft(uid, note);
+  }, 1000));
+}
+function cancelScheduledLocalNoteDraft(id) {
+  id = String(id);
+  clearTimeout(localNoteDraftTimers.get(id));
+  localNoteDraftTimers.delete(id);
 }
 function clearLocalNoteDraft(uid, id) {
   if (!uid) return;
@@ -169,6 +207,15 @@ function setAuthState(status, user = null) {
   const previousStatus = authState;
   const previousUid = lastUser?.uid || null;
   const userChanged = previousUid !== (user?.uid || null);
+  if ((userChanged || status !== 'authenticated') && previousUid) {
+    const active = window.activeNoteId ? updateActiveNoteFromEditor() : null;
+    if (active?.changed) markNoteDirty(active.note);
+    for (const id of pendingNoteSaves) {
+      let note = findNoteById(id);
+      if (note) writeLocalNoteDraft(previousUid, note);
+      cancelScheduledLocalNoteDraft(id);
+    }
+  }
   authState = status;
   lastUser = user;
   window.settingsUser = ['authenticated','unverified'].includes(status) ? user : null;
@@ -177,13 +224,21 @@ function setAuthState(status, user = null) {
   const resendHelp = byId('unverifiedLoginHelp');
   if (resendHelp) resendHelp.style.display = status === 'unverified' ? '' : 'none';
   window.currentUser = status === 'authenticated' ? user : null;
-  if (status !== 'authenticated' || userChanged) window.notes = [];
+  if (status !== 'authenticated' || userChanged) { window.notes = []; activeNoteModel = null; activeNoteOwnerUid = null; }
   if (status !== 'authenticated' || userChanged) {
     noteRevisions.clear(); savedNoteRevisions.clear(); pendingNoteSaves.clear();
   }
   if (status !== 'authenticated') {
     window.activeNoteId = null;
     clearTimeout(window.autoSaveTimer);
+  }
+  if (userChanged) {
+    window.activeNoteId = null;
+    clearTimeout(window.autoSaveTimer);
+    window.deleteTargetId = null;
+    byId('deleteModal')?.classList.remove('open');
+    if (byId('editorActive')) byId('editorActive').style.display = 'none';
+    if (byId('editorEmpty')) byId('editorEmpty').style.display = 'flex';
   }
   refreshNav();
   window.renderSettingsView?.(user, status);
@@ -217,17 +272,44 @@ function setAuthState(status, user = null) {
 
 async function loadNotes(uid = lastUser?.uid) {
   if (authState !== 'authenticated' || !uid) return;
+  if (window.activeNoteId && pendingNoteSaves.has(String(window.activeNoteId))) updateActiveNoteFromEditor();
   const list = byId('notesList');
   if (list) { list.innerHTML = `<div class="notes-empty-state"><div class="empty-icon">${window.shinobiIcon('scroll','ui-icon shinobi-icon empty-scroll-icon')}</div><p>Opening your scroll archive…</p></div>`; window.renderLucideIcons?.(list); }
   try {
     const notes = await notesController.load();
     if (authState !== 'authenticated' || lastUser?.uid !== uid) return;
+    // The archive request can finish after a scroll was created or edited.
+    // Capture the active editor now (after the await) so a stale response cannot
+    // replace it with an archive snapshot that predates that scroll.
+    const activeId = String(window.activeNoteId || '');
+    const activeSnapshot = activeId
+      ? updateActiveNoteFromEditor()?.note || restoreActiveNoteModel(activeId)
+      : null;
     const drafts = readLocalNoteDrafts(uid);
+    const preservedPending = new Set(pendingNoteSaves);
     window.notes = notes.map(note => {
       const draft = drafts[String(note.id)];
-      if (!draft || typeof draft.content !== 'string' || draft.content.length > 180_000 || typeof draft.title !== 'string') return note;
+      if (!draft || typeof draft.content !== 'string' || draft.content.length > MAX_RECOVERY_DRAFT_LENGTH || typeof draft.title !== 'string') return note;
+      const baseUpdatedAt = Number(draft.baseUpdatedAt);
+      const cloudUpdatedAt = Number(note.updatedAt);
+      const draftDiffers = draft.title !== note.title || draft.content !== note.content || JSON.stringify(draft.tags || []) !== JSON.stringify(note.tags || []) || Boolean(draft.pinned) !== Boolean(note.pinned);
+      if (Number.isFinite(baseUpdatedAt) && baseUpdatedAt > 0 && Number.isFinite(cloudUpdatedAt) && cloudUpdatedAt > baseUpdatedAt && draftDiffers) {
+        return { ...note, hasRecoveryConflict: true, recoveryDraft: draft };
+      }
       return { ...note, title: draft.title.slice(0,255) || 'Untitled', content: sanitizeNoteHtml(draft.content), tags: Array.isArray(draft.tags) ? draft.tags.filter(tag => typeof tag === 'string').slice(0,20) : note.tags, pinned: !!draft.pinned, hasLocalDraft: true };
     });
+    if (activeId && activeSnapshot && (preservedPending.has(activeId) || !window.notes.some(note => String(note.id) === activeId))) {
+      const existingIndex = window.notes.findIndex(note => String(note.id) === activeId);
+      const preserved = { ...(existingIndex >= 0 ? window.notes[existingIndex] : {}), ...activeSnapshot, hasLocalDraft: true };
+      if (existingIndex >= 0) window.notes[existingIndex] = preserved;
+      else window.notes.unshift(preserved);
+      activeNoteModel = preserved;
+      activeNoteOwnerUid = uid;
+      writeLocalNoteDraft(uid, preserved);
+    } else if (activeId) {
+      const loadedActive = window.notes.find(note => String(note.id) === activeId);
+      if (loadedActive && activeNoteOwnerUid === uid) activeNoteModel = loadedActive;
+    }
     noteRevisions.clear(); savedNoteRevisions.clear(); pendingNoteSaves.clear();
     notes.forEach(note => { noteRevisions.set(String(note.id), 0); savedNoteRevisions.set(String(note.id), 0); });
     window.notes.forEach(note => {
@@ -305,26 +387,61 @@ window.logout = async () => {
 };
 
 window.createNote = async () => {
+  if (noteCreateTask) return noteCreateTask;
   if (!requirePrivateAccess()) return;
-  try {
-    if (window.activeNoteId) {
-      clearTimeout(window.autoSaveTimer);
-      if (!await window.saveNote()) return;
-    }
-    const note = await notesController.create({ title: 'New Scroll', content: '', tags: [], pinned: false });
-    storeNote(note); window.openNote?.(note.id); window.showToast?.('New scroll created', 'success');
-  } catch (error) { notifyError('create note', error); }
+  const task = (async () => {
+    try {
+      if (window.activeNoteId) {
+        clearTimeout(window.autoSaveTimer);
+        if (!await window.saveNote()) return;
+      }
+      const ownerUid = lastUser?.uid;
+      if (!ownerUid || firebaseServices().auth.currentUser?.uid !== ownerUid) return;
+      const pendingCreate = acquirePendingNoteCreate(ownerUid);
+      const note = await notesController.create({ id: pendingCreate.id, title: 'New Scroll', content: '', tags: [], pinned: false }, { retry: pendingCreate.retry, ownerUid });
+      clearPendingNoteCreate(ownerUid);
+      if (lastUser?.uid !== ownerUid || firebaseServices().auth.currentUser?.uid !== ownerUid) return note;
+      storeNote(note); window.openNote?.(note.id); window.showToast?.('New scroll created', 'success');
+      return note;
+    } catch (error) { notifyError('create note', error); }
+  })();
+  noteCreateTask = task;
+  try { return await task; }
+  finally { if (noteCreateTask === task) noteCreateTask = null; }
 };
 
 window.openNote = async id => {
   if (!requirePrivateAccess()) return false;
-  const note = window.notes.find(item => String(item.id) === String(id)); if (!note) return false;
+  let note = window.notes.find(item => String(item.id) === String(id)); if (!note) return false;
   if (window.activeNoteId && String(window.activeNoteId) !== String(id)) {
     clearTimeout(window.autoSaveTimer);
     const saved = await window.saveNote({ manual: false });
-    if (!saved && !window.confirm('This scroll could not be sealed. Keep editing, or continue with the current changes still pending and retry later?')) return false;
+    if (!saved) {
+      const backedUp = Boolean(window.backupActiveNoteDraft?.());
+      const reason = noteSaveFailureMessage ? ` Save error: ${noteSaveFailureMessage.replace(/[.!?]+$/, '')}.` : '';
+      const recovery = backedUp ? 'A local recovery copy is saved on this browser.' : 'A local recovery copy could not be confirmed.';
+      if (!window.confirm(`This scroll could not be saved to your account.${reason} ${recovery} Continue opening the other scroll?`)) return false;
+    }
+  }
+  if (note.hasRecoveryConflict && note.recoveryDraft) {
+    const restoreLocal = window.confirm('A local recovery copy and a newer cloud copy are different. OK restores the local copy for this scroll. Cancel keeps the cloud copy and discards the local recovery copy.');
+    const index = window.notes.findIndex(item => String(item.id) === String(id));
+    if (restoreLocal) {
+      const draft = note.recoveryDraft;
+      note = { ...note, title: draft.title || 'Untitled', content: sanitizeNoteHtml(draft.content), tags: Array.isArray(draft.tags) ? draft.tags.filter(tag => typeof tag === 'string').slice(0,20) : note.tags, pinned: !!draft.pinned, hasLocalDraft: true };
+      delete note.hasRecoveryConflict; delete note.recoveryDraft;
+      noteRevisions.set(String(id), 0); savedNoteRevisions.set(String(id), 0); pendingNoteSaves.delete(String(id));
+      markNoteDirty(note);
+    } else {
+      clearLocalNoteDraft(lastUser?.uid, id);
+      note = { ...note }; delete note.hasRecoveryConflict; delete note.recoveryDraft;
+    }
+    if (index >= 0) window.notes[index] = note;
+    window.renderNotesList?.();
   }
   window.activeNoteId = id; window.isReadMode = false;
+  activeNoteModel = note;
+  activeNoteOwnerUid = lastUser?.uid || null;
   if (!noteRevisions.has(String(id))) { noteRevisions.set(String(id), 0); savedNoteRevisions.set(String(id), 0); }
   if (byId('editorEmpty')) byId('editorEmpty').style.display = 'none';
   const active = byId('editorActive'); if (active) { active.style.display = 'flex'; active.style.flexDirection = 'column'; active.style.height = '100%'; }
@@ -375,6 +492,7 @@ function setNoteSaveStatus(state, message) {
 window.setNoteSaveStatus = setNoteSaveStatus;
 window.isNotePendingSave = id => pendingNoteSaves.has(String(id));
 window.hasPendingNoteSaves = () => pendingNoteSaves.size > 0;
+window.getNoteSaveFailureMessage = () => noteSaveFailureMessage;
 window.retryNoteSave = async (id, event) => {
   event?.stopPropagation();
   const saved = await flushNoteSave(id);
@@ -382,7 +500,14 @@ window.retryNoteSave = async (id, event) => {
   return saved;
 };
 window.addEventListener('beforeunload', event => {
-  if (![...pendingNoteSaves].some(id => !readLocalNoteDrafts(lastUser?.uid)[id])) return;
+  const active = window.activeNoteId ? updateActiveNoteFromEditor() : null;
+  if (active?.changed) markNoteDirty(active.note);
+  const missingBackup = [...pendingNoteSaves].some(id => {
+    const note = window.notes.find(item => String(item.id) === id);
+    cancelScheduledLocalNoteDraft(id);
+    return !note || !writeLocalNoteDraft(lastUser?.uid, note);
+  });
+  if (!missingBackup) return;
   event.preventDefault();
   event.returnValue = '';
 });
@@ -390,16 +515,79 @@ window.addEventListener('beforeunload', event => {
 
 
 function markNoteDirty(note) {
-  const id = String(note.id);
+  const id = normalizeNoteId(note?.id);
+  if (!id) return false;
   noteRevisions.set(id, (noteRevisions.get(id) || 0) + 1);
   pendingNoteSaves.add(id);
-  writeLocalNoteDraft(lastUser?.uid, note);
+  scheduleLocalNoteDraft(lastUser?.uid, note);
   if (String(window.activeNoteId) === id) setNoteSaveStatus('unsaved', 'Unsaved changes');
   window.renderNotesList?.();
+  return true;
+}
+
+function restoreActiveNoteModel(id) {
+  id = normalizeNoteId(id);
+  const uid = lastUser?.uid;
+  // Reconstructing an editor model is local-only. Firebase's currentUser can
+  // briefly be null while Auth restores persistence, so defer that check until
+  // flushNoteSave rather than misreporting the scroll as absent from the archive.
+  if (!id || !uid || authState !== 'authenticated' || normalizeNoteId(window.activeNoteId) !== id) return null;
+
+  const existing = activeNoteModel && activeNoteOwnerUid === uid && String(activeNoteModel.id) === id ? activeNoteModel : null;
+  const draft = readLocalNoteDrafts(uid)[id];
+  const editor = byId('note-content-editor');
+  const titleInput = byId('noteTitleInput');
+  if (!existing && !draft && !editor) return null;
+
+  const tags = Array.isArray(draft?.tags) ? draft.tags : [...(byId('tagsList')?.querySelectorAll('.tag-chip') || [])].map(tag => tag.firstChild?.textContent?.trim()).filter(Boolean);
+  const recovered = {
+    ...(draft ? { id, title: draft.title || 'Untitled', content: sanitizeNoteHtml(draft.content || ''), tags, pinned: !!draft.pinned, color: 'default', updatedAt: Number(draft.baseUpdatedAt) || null } : {}),
+    ...(existing || {}),
+    id,
+    title: titleInput?.value || existing?.title || draft?.title || 'Untitled',
+    content: sanitizeNoteHtml(editor?.innerHTML ?? existing?.content ?? draft?.content ?? ''),
+    tags: existing?.tags || tags,
+    pinned: existing?.pinned ?? (byId('pinBtn')?.classList.contains('active') || !!draft?.pinned),
+    color: existing?.color || 'default',
+    hasLocalDraft: true,
+  };
+  activeNoteModel = recovered;
+  activeNoteOwnerUid = uid;
+  preserveActiveNoteForSave(recovered, uid);
+  return recovered;
+}
+
+function preserveActiveNoteForSave(note, uid = lastUser?.uid) {
+  const id = normalizeNoteId(note?.id);
+  if (!id) return null;
+  const revision = noteRevisions.get(id);
+  if (!pendingNoteSaves.has(id) && (revision === undefined || (savedNoteRevisions.get(id) || 0) >= revision)) {
+    noteRevisions.set(id, (revision || 0) + 1);
+    savedNoteRevisions.set(id, revision || 0);
+  }
+  pendingNoteSaves.add(id);
+  activeNoteModel = note;
+  activeNoteOwnerUid = uid;
+  window.notes.unshift(note);
+  writeLocalNoteDraft(uid, note);
+}
+
+function findNoteById(id) {
+  id = normalizeNoteId(id);
+  if (!id) return null;
+  const note = window.notes.find(item => String(item.id) === id);
+  if (note) return note;
+  if (activeNoteModel && activeNoteOwnerUid === lastUser?.uid && String(activeNoteModel.id) === id) {
+    preserveActiveNoteForSave(activeNoteModel);
+    return activeNoteModel;
+  }
+  return restoreActiveNoteModel(id);
 }
 
 function updateActiveNoteFromEditor() {
-  const note = window.notes.find(item => String(item.id) === String(window.activeNoteId));
+  const activeId = normalizeNoteId(window.activeNoteId);
+  if (!activeId) return null;
+  const note = findNoteById(activeId);
   if (!note) return null;
   const previousTitle = note.title;
   const previousContent = note.content;
@@ -409,24 +597,82 @@ function updateActiveNoteFromEditor() {
 }
 
 function flushNoteSave(id) {
-  id = String(id);
+  id = normalizeNoteId(id);
+  if (!id) {
+    noteSaveFailureMessage = 'This scroll is missing its archive ID, so it was not sent to Firestore.';
+    return Promise.resolve(false);
+  }
   const currentTask = noteSaveTasks.get(id);
   if (currentTask) return currentTask.then(() => flushNoteSave(id));
   const task = (async () => {
     while ((savedNoteRevisions.get(id) || 0) < (noteRevisions.get(id) || 0)) {
-      if (authState !== 'authenticated' || !lastUser?.uid) return false;
-      const note = window.notes.find(item => String(item.id) === id);
-      if (!note) return false;
+      if (authState !== 'authenticated' || !lastUser?.uid || firebaseServices().auth.currentUser?.uid !== lastUser.uid) {
+        noteSaveFailureMessage = 'Your sign-in session is unavailable. Sign in again before saving this scroll.';
+        return false;
+      }
+      const note = findNoteById(id);
+      if (!note) {
+        try {
+          const remote = await notesController.get(id);
+          if (!remote) {
+            noteSaveFailureMessage = 'This scroll could not be found in your cloud archive. Your recovery draft is kept on this browser.';
+            return false;
+          }
+          const draft = readLocalNoteDrafts(lastUser.uid)[id];
+          const isActive = String(window.activeNoteId) === id;
+          const tags = Array.isArray(draft?.tags) ? draft.tags : [...(byId('tagsList')?.querySelectorAll('.tag-chip') || [])].map(tag => tag.firstChild?.textContent?.trim()).filter(Boolean);
+          const recovered = {
+            ...remote,
+            ...(draft ? { title: draft.title || remote.title, content: sanitizeNoteHtml(draft.content || ''), tags, pinned: !!draft.pinned } : {}),
+            ...(isActive ? {
+              title: byId('noteTitleInput')?.value || draft?.title || remote.title,
+              content: sanitizeNoteHtml(byId('note-content-editor')?.innerHTML ?? draft?.content ?? remote.content),
+              tags,
+              pinned: byId('pinBtn')?.classList.contains('active') ?? remote.pinned,
+            } : {}),
+            hasLocalDraft: true,
+          };
+          const existingIndex = window.notes.findIndex(item => String(item.id) === id);
+          if (existingIndex >= 0) window.notes[existingIndex] = recovered;
+          else window.notes.unshift(recovered);
+          if (isActive) { activeNoteModel = recovered; activeNoteOwnerUid = lastUser.uid; }
+          writeLocalNoteDraft(lastUser.uid, recovered);
+          window.renderNotesList?.();
+          note = recovered;
+        } catch (error) {
+          noteSaveFailureMessage = error?.code ? `${userMessage(error)} (${error.code})` : userMessage(error);
+          return false;
+        }
+      }
       const revision = noteRevisions.get(id) || 0;
       const uid = lastUser.uid;
       if (String(window.activeNoteId) === id) setNoteSaveStatus('saving', 'Sealing…');
       try {
-        const snapshot = normalizeNote({ ...note, tags: [...(note.tags || [])] });
-        const saved = await notesController.update(id, snapshot);
-        if (lastUser?.uid !== uid || authState !== 'authenticated') return false;
+        let saved;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (lastUser?.uid !== uid || authState !== 'authenticated' || firebaseServices().auth.currentUser?.uid !== uid) {
+            noteSaveFailureMessage = 'Your sign-in session changed before the save completed. Sign in again and retry.';
+            return false;
+          }
+          try {
+            const snapshot = normalizeNote({ ...note, tags: [...(note.tags || [])] });
+            saved = await notesController.update(id, snapshot);
+            break;
+          } catch (error) {
+            const transient = ['unavailable', 'deadline-exceeded', 'aborted'].includes(error?.code);
+            if (!transient || attempt === 2) throw error;
+            await new Promise(resolve => setTimeout(resolve, 350 * (2 ** attempt)));
+          }
+        }
+        if (lastUser?.uid !== uid || authState !== 'authenticated' || firebaseServices().auth.currentUser?.uid !== uid) {
+          noteSaveFailureMessage = 'Your sign-in session changed before the save completed. Sign in again and retry.';
+          return false;
+        }
+        noteSaveFailureMessage = '';
         savedNoteRevisions.set(id, revision);
         if ((noteRevisions.get(id) || 0) === revision) {
           pendingNoteSaves.delete(id);
+          cancelScheduledLocalNoteDraft(id);
           clearLocalNoteDraft(uid, id);
           if (!pendingNoteSaves.size) window.notesLeaveFailureAcknowledged = false;
         }
@@ -438,6 +684,8 @@ function flushNoteSave(id) {
           setNoteSaveStatus('saved', `Sealed: ${new Date(saved.updatedAt).toLocaleTimeString()}`);
         }
       } catch (error) {
+        noteSaveFailureMessage = error?.code ? `${userMessage(error)} (${error.code})` : userMessage(error);
+        writeLocalNoteDraft(uid, note);
         if (String(window.activeNoteId) === id) {
           setNoteSaveStatus('failed', `Save failed: ${userMessage(error)}`);
           const status = byId('lastSaved');
@@ -454,10 +702,24 @@ function flushNoteSave(id) {
   return task.finally(() => { if (noteSaveTasks.get(id) === task) noteSaveTasks.delete(id); });
 }
 
+window.backupActiveNoteDraft = () => {
+  const active = updateActiveNoteFromEditor();
+  if (!active) return false;
+  if (active.changed) markNoteDirty(active.note);
+  cancelScheduledLocalNoteDraft(active.note.id);
+  return writeLocalNoteDraft(lastUser?.uid, active.note);
+};
+
 window.saveNote = async (options = {}) => {
   if (!requirePrivateAccess()) return false;
   clearTimeout(window.autoSaveTimer);
-  const id = String(window.activeNoteId || '');
+  const id = normalizeNoteId(window.activeNoteId);
+  if (!id) {
+    if (byId('editorActive')?.style.display === 'none') return true;
+    noteSaveFailureMessage = 'This scroll is missing its archive ID, so it was not sent to Firestore.';
+    setNoteSaveStatus('failed', 'Scroll reference missing; save was not confirmed');
+    return false;
+  }
   const snapshot = updateActiveNoteFromEditor();
   if (!snapshot) return true;
   if (snapshot.changed && (savedNoteRevisions.get(id) || 0) >= (noteRevisions.get(id) || 0)) markNoteDirty(snapshot.note);
@@ -500,6 +762,12 @@ byId('note-content-editor')?.addEventListener('paste', event => {
   if (pastedHtml) {
     const parsed = new DOMParser().parseFromString(pastedHtml, 'text/html');
     parsed.querySelectorAll('script,style,meta,link,iframe,object,embed').forEach(node => node.remove());
+    parsed.querySelectorAll('[style]').forEach(node => {
+      node.style.removeProperty('color');
+      node.style.removeProperty('background');
+      node.style.removeProperty('background-color');
+      if (!node.getAttribute('style')?.trim()) node.removeAttribute('style');
+    });
     pastedHtml = sanitizeNoteHtml(parsed.body.innerHTML);
   } else {
     const plainText = clipboard.getData('text/plain');
@@ -527,11 +795,16 @@ window.confirmDelete = async () => {
   if (!requirePrivateAccess()) return;
   if (!window.deleteTargetId) return;
   const id = String(window.deleteTargetId);
+  const ownerUid = lastUser?.uid;
+  if (!findNoteById(id)) return notifyError('delete note', Object.assign(new Error('This scroll is no longer in your loaded archive. Refresh the archive and try again.'), { code: 'not-found' }));
   try {
     if (pendingNoteSaves.has(id) && !await flushNoteSave(id)) return;
-    await notesController.remove(id); window.notes = window.notes.filter(note => String(note.id) !== id);
+    if (!ownerUid || lastUser?.uid !== ownerUid || firebaseServices().auth.currentUser?.uid !== ownerUid || !findNoteById(id)) return;
+    await notesController.remove(id);
+    if (lastUser?.uid !== ownerUid || firebaseServices().auth.currentUser?.uid !== ownerUid) return;
+    window.notes = window.notes.filter(note => String(note.id) !== id);
     noteRevisions.delete(id); savedNoteRevisions.delete(id); pendingNoteSaves.delete(id);
-    if (String(window.activeNoteId) === id) { window.activeNoteId = null; if (byId('editorEmpty')) byId('editorEmpty').style.display = 'flex'; if (byId('editorActive')) byId('editorActive').style.display = 'none'; }
+    if (String(window.activeNoteId) === id) { window.activeNoteId = null; activeNoteModel = null; activeNoteOwnerUid = null; if (byId('editorEmpty')) byId('editorEmpty').style.display = 'flex'; if (byId('editorActive')) byId('editorActive').style.display = 'none'; }
     window.closeDeleteModal?.(); window.renderNotesList?.(); refreshProfile(); window.showToast?.('Scroll destroyed', 'success');
   } catch (error) { notifyError('delete note', error); }
 };

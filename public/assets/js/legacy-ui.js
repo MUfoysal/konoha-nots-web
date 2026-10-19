@@ -223,7 +223,11 @@ function showView(name,sub){
     notesLeaveGuardActive=true;
     void (async()=>{
       const saved=await window.flushAllNoteSaves?.();
-      if(saved===false&&!window.confirm('This scroll could not be sealed. A local draft has been kept when browser storage is available. Stay here, or continue leaving and retry later?')){notesLeaveGuardActive=false;return}
+      const reason=window.getNoteSaveFailureMessage?.();
+      const backedUp=saved===false&&Boolean(window.backupActiveNoteDraft?.());
+      const detail=reason?` Save error: ${reason.replace(/[.!?]+$/,'')}.`:'';
+      const recovery=backedUp?'A recovery draft was saved on this browser.':'A local recovery draft could not be confirmed.';
+      if(saved===false&&!window.confirm(`This scroll could not be saved to your account.${detail} ${recovery} OK leaves now; the cloud copy will need a retry. Cancel stays here.`)){notesLeaveGuardActive=false;return}
       if(saved===false)window.notesLeaveFailureAcknowledged=true;
       notesLeaveGuardBypass=true;
       try{showView(name,sub)}finally{notesLeaveGuardBypass=false;notesLeaveGuardActive=false}
@@ -344,6 +348,7 @@ function createNoteListItem(note){
   const wordCount=document.createElement('span');wordCount.className='note-item-word-count';wordCount.textContent=`${noteText.trim().split(/\s+/).filter(Boolean).length} words`;meta.append(wordCount);open.append(meta);article.append(open);
   const indicators=document.createElement('div');indicators.className='note-item-indicators';
   if(note.pinned){const seal=document.createElement('span');seal.className='badge badge-pin';seal.innerHTML=window.shinobiIcon('seal-pin')+' Pinned';indicators.append(seal)}
+  if(note.hasRecoveryConflict){const conflict=document.createElement('span');conflict.className='badge badge-unsaved';conflict.textContent='Recovery conflict';conflict.setAttribute('aria-label','A local recovery copy differs from a newer cloud copy');indicators.append(conflict)}
   if(window.isNotePendingSave?.(note.id)){const pending=document.createElement('span');pending.className='badge badge-unsaved';pending.textContent='Unsaved';pending.setAttribute('aria-label','Changes are waiting to be saved');indicators.append(pending)}
   (note.tags||[]).slice(0,2).forEach(tag=>{const chip=document.createElement('span');chip.className='badge badge-sealed';chip.textContent=tag;indicators.append(chip)});
   if((note.tags||[]).length>2){const more=document.createElement('span');more.className='badge badge-sealed';more.textContent=`+${note.tags.length-2}`;indicators.append(more)}
@@ -378,7 +383,8 @@ async function toggleMobileNotesList(){
   if(window.innerWidth>1023)return;
   if(window.history.state?.konohaNotesEditor){window.history.back();return}
   const saved=window.activeNoteId?await window.saveNote?.({manual:false}):true;
-  if(saved===false)return;
+  if(saved===false&&!window.backupActiveNoteDraft?.()&&!window.confirm('The scroll could not be saved, and a local backup could not be created. Leave the editor anyway?'))return;
+  if(saved===false)window.showToast?.('Cloud save failed. Your local draft is kept on this browser; retry when connected.','error');
   closeMobileDrawer();
 }
 
@@ -397,6 +403,13 @@ window.addEventListener('popstate',()=>{
   void (async()=>{
     const saved=window.activeNoteId?await window.saveNote?.({manual:false}):true;
     if(saved===false){
+      if(window.backupActiveNoteDraft?.()){
+        window.showToast?.('Cloud save failed. Your local draft is kept on this browser; retry when connected.','error');
+        closeMobileDrawer();return;
+      }
+      if(window.confirm('The scroll could not be saved, and a local backup could not be created. Leave the editor anyway?')){
+        closeMobileDrawer();return;
+      }
       const current=window.history.state&&typeof window.history.state==='object'?window.history.state:{};
       window.history.pushState({...current,konohaNotesEditor:true,noteId:String(window.activeNoteId||'')},'',window.location.href);
       notesEditorHistoryActive=true;return;

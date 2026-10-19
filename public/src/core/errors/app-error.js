@@ -30,6 +30,10 @@ const AUTH_MESSAGES = {
   'konoha/username-taken': 'That username is already in use.',
   'konoha/username-reservation-denied': 'Could not reserve this username. It may already be taken, or Firestore Security Rules may be blocking registration.',
   'konoha/verification-send-failed': 'Your account was created, but the verification email could not be sent. Use “Resend verification email” to try again.',
+  'not-found': 'This scroll no longer exists in your cloud archive. Refresh the archive; the local recovery draft is still available on this browser.',
+  'resource-exhausted': 'The Firebase quota or document size limit was reached. Reduce the scroll size or try again later.',
+  'deadline-exceeded': 'Firebase did not confirm the save in time. Your local recovery draft is available; retry when the connection is stable.',
+  aborted: 'Firebase interrupted the save. Your local recovery draft is available; retry the save.',
 };
 
 export function userMessage(error) {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { noteFromDocument, validateNote } from '../../public/src/features/notes/domain/entities/note.js';
+import { MAX_NOTE_CONTENT_LENGTH, normalizeNoteId, noteFromDocument, validateNote } from '../../public/src/features/notes/domain/entities/note.js';
+import { createNote } from '../../public/src/features/notes/domain/usecases/note-use-cases.js';
 import { calculateProfileStatistics } from '../../public/src/features/profile/domain/usecases/calculate-profile-statistics.js';
 import { filterAndSortNotes } from '../../public/src/features/notes/domain/usecases/filter-and-sort-notes.js';
 
@@ -16,6 +17,22 @@ test('invalid note payloads are rejected before reaching Firestore', () => {
   assert.throws(() => validateNote({ title: 'x', content: '', tags: [], pinned: 'yes' }), /pin state/);
 });
 
+test('note content validation matches the deployed Firestore rule limit', () => {
+  assert.equal(validateNote({ title: 'x', content: 'a'.repeat(MAX_NOTE_CONTENT_LENGTH), tags: [], pinned: false }).content.length, MAX_NOTE_CONTENT_LENGTH);
+  assert.throws(() => validateNote({ title: 'x', content: 'a'.repeat(MAX_NOTE_CONTENT_LENGTH + 1), tags: [], pinned: false }), /180,000 characters/);
+});
+
+test('note creation forwards a stable retry ID and owner context to the repository', async () => {
+  let created;
+  const repository = { create: async (input, options) => { created = { input, options }; return { id: input.id }; } };
+  const result = await createNote(repository, { id: 'stable-id', title: 'New Scroll', content: '', tags: [], pinned: false }, { retry: true, ownerUid: 'owner-a' });
+  assert.deepEqual(created, {
+    input: { id: 'stable-id', title: 'New Scroll', content: '', tags: [], pinned: false, color: 'default' },
+    options: { retry: true, ownerUid: 'owner-a' },
+  });
+  assert.deepEqual(result, { id: 'stable-id' });
+});
+
 test('Firestore timestamps map to the legacy UI millisecond model', () => {
   const note = noteFromDocument('id-1', { title: 'N', content: '', tags: [], isPinned: true, createdAt: { toMillis: () => 10 }, updatedAt: { toMillis: () => 20 } });
   assert.equal(note.id, 'id-1');
@@ -28,6 +45,12 @@ test('missing Firestore timestamps remain unavailable instead of being invented'
   const note = noteFromDocument('id-2', { title: 'N', content: '', tags: [], isPinned: false });
   assert.equal(note.createdAt, null);
   assert.equal(note.updatedAt, null);
+});
+
+test('note IDs reject absent and stringified sentinel values', () => {
+  for (const invalid of [undefined, null, '', '  ', 'undefined', 'null']) assert.equal(normalizeNoteId(invalid), '');
+  assert.equal(normalizeNoteId('  note-id  '), 'note-id');
+  assert.equal(normalizeNoteId(42), '42');
 });
 
 test('profile ranks and statistics are derived from the signed-in user notes', () => {

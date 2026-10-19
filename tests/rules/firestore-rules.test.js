@@ -58,6 +58,14 @@ test('unauthenticated access and invalid note shapes are denied', async () => {
   await assertFails(setDoc(doc(owner, 'users', 'owner', 'notes', 'long-tag'), { ...noteData(), tags: ['x'.repeat(41)] }));
 });
 
+test('note content stays within the existing Firestore rule limit', async () => {
+  const db = environment.authenticatedContext('content-owner', { email: 'c@example.test', email_verified: true }).firestore();
+  const accepted = doc(db, 'users', 'content-owner', 'notes', 'max-content');
+  await assertSucceeds(setDoc(accepted, { ...noteData(), content: 'a'.repeat(180_000) }));
+  const rejected = doc(db, 'users', 'content-owner', 'notes', 'oversized-content');
+  await assertFails(setDoc(rejected, { ...noteData(), content: 'a'.repeat(180_001) }));
+});
+
 test('username claims are private, owner-bound, and cannot be taken twice', async () => {
   const first = environment.authenticatedContext('first').firestore();
   const username = doc(first, 'usernames', 'leaf_writer');
