@@ -821,6 +821,7 @@ window.confirmDelete = async () => {
   if (!window.deleteTargetId) return;
   const id = String(window.deleteTargetId);
   const ownerUid = lastUser?.uid;
+  const deletedActiveNote = String(window.activeNoteId || '') === id;
   if (!findNoteById(id)) return notifyError('delete note', Object.assign(new Error('This scroll is no longer in your loaded archive. Refresh the archive and try again.'), { code: 'not-found' }));
   try {
     if (pendingNoteSaves.has(id) && !await flushNoteSave(id)) return;
@@ -829,8 +830,12 @@ window.confirmDelete = async () => {
     if (lastUser?.uid !== ownerUid || firebaseServices().auth.currentUser?.uid !== ownerUid) return;
     window.notes = window.notes.filter(note => String(note.id) !== id);
     noteRevisions.delete(id); savedNoteRevisions.delete(id); pendingNoteSaves.delete(id);
-    if (String(window.activeNoteId) === id) { window.activeNoteId = null; activeNoteModel = null; activeNoteOwnerUid = null; if (byId('editorEmpty')) byId('editorEmpty').style.display = 'flex'; if (byId('editorActive')) byId('editorActive').style.display = 'none'; }
+    if (deletedActiveNote) { window.activeNoteId = null; activeNoteModel = null; activeNoteOwnerUid = null; if (byId('editorEmpty')) byId('editorEmpty').style.display = 'flex'; if (byId('editorActive')) byId('editorActive').style.display = 'none'; }
     window.closeDeleteModal?.(); window.renderNotesList?.(); refreshProfile(); window.showToast?.('Scroll destroyed', 'success');
+    if (deletedActiveNote && window.innerWidth <= 1023) {
+      byId('notesEditor')?.classList.remove('drawer-open');
+      document.querySelector('.notes-sidebar')?.classList.remove('drawer-hidden', 'list-open');
+    }
   } catch (error) { notifyError('delete note', error); }
 };
 window.handleTagInput = event => {
