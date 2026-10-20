@@ -3471,3 +3471,26 @@ input,textarea,button,select{-webkit-appearance:none;appearance:none;border-radi
 #view-notes .snippets-empty>span:last-child{color:var(--text3);font-size:.58rem;line-height:1.45}
 @media(max-width:620px){#view-notes .quick-snippets-popover{top:58px;right:8px;width:min(340px,calc(100% - 16px));max-height:64vh}.toolbar-actions .snippet-launch-btn{width:34px;height:32px}}
 
+/* Keep the archive control visible in the compact editor toolbar. */
+@media(max-width:1023px){
+  #view-notes #editorActive .editor-toolbar>.mobile-back-btn{
+    display:inline-flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    min-width:64px;
+    min-height:44px;
+    padding:6px 10px;
+    border:1px solid var(--border2);
+    background:var(--surf2);
+    color:var(--text1);
+    white-space:nowrap;
+    position:relative;
+    z-index:4;
+    grid-column:1;
+    grid-row:1;
+  }
+}
+
