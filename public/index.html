@@ -12,7 +12,7 @@
 
 
 <base target="_blank">
-  <link rel="stylesheet" href="assets/css/app.css?v=20261020-2">
+  <link rel="stylesheet" href="assets/css/app.css?v=20261020-3">
 </head>
 <body>
 <div class="kn-splash">
@@ -704,11 +704,13 @@
     </div>
     <div id="editorActive" style="display:none;flex-direction:column;height:100%;overflow:hidden">
       <div class="editor-toolbar">
-        <button class="mobile-back-btn" type="button" onclick="toggleMobileNotesList()" aria-label="Show saved scrolls" aria-controls="notesList">
-          <i class="ui-icon shinobi-icon" data-shinobi-icon="archive-scroll" aria-hidden="true" width="14" height="14"></i>
-          Scrolls
-        </button>
-        <input class="editor-title-input" type="text" id="noteTitleInput" aria-label="Note title" placeholder="Scroll Title..." oninput="updateNoteTitle()"/>
+        <div class="editor-identity-row">
+          <button class="mobile-back-btn" type="button" onclick="toggleMobileNotesList()" aria-label="Show saved scrolls" aria-controls="notesList">
+            <i class="ui-icon shinobi-icon" data-shinobi-icon="archive-scroll" aria-hidden="true" width="14" height="14"></i>
+            Scrolls
+          </button>
+          <input class="editor-title-input" type="text" id="noteTitleInput" aria-label="Note title" placeholder="Scroll Title..." oninput="updateNoteTitle()"/>
+        </div>
         <div class="toolbar-actions">
           <button class="toolbar-btn" id="pinBtn" onclick="togglePin()"><i class="ui-icon shinobi-icon" data-shinobi-icon="seal-pin" aria-hidden="true" width="14" height="14"></i> <span>Pin</span></button>
           <button class="toolbar-btn" id="readBtn" type="button" onclick="toggleReadMode()"><i class="ui-icon" data-lucide="eye" aria-hidden="true" width="14" height="14"></i> <span>Read</span></button>
