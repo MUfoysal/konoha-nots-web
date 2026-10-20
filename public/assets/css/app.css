@@ -3319,6 +3319,11 @@ input,textarea,button,select{-webkit-appearance:none;appearance:none;border-radi
   #view-notes #lastSaved{margin-left:0;flex:1 1 100%;order:2}
   #view-notes .retry-save-btn{order:3}
 }
+/* Keep the scroll identity row below the fixed AppBar on phones. */
+@media(max-width:1023px){
+  #view-notes .notes-editor{top:56px;bottom:0}
+  #view-notes.active.notes-space-expanded .notes-editor{top:0}
+}
 @media(min-width:1024px){
   #view-notes .notes-sidebar.archive-collapsed{flex-basis:68px;width:68px}
   #view-notes .notes-sidebar.archive-collapsed .notes-sidebar-title>span:first-child,
