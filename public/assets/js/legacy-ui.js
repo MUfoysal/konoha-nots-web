@@ -382,10 +382,7 @@ function closeMobileDrawer(){
 async function toggleMobileNotesList(){
   if(window.innerWidth>1023)return;
   if(window.history.state?.konohaNotesEditor){window.history.back();return}
-  const saved=window.activeNoteId?await window.saveNote?.({manual:false}):true;
-  if(saved===false&&!window.backupActiveNoteDraft?.()&&!window.confirm('The scroll could not be saved, and a local backup could not be created. Leave the editor anyway?'))return;
-  if(saved===false)window.showToast?.('Cloud save failed. Your local draft is kept on this browser; retry when connected.','error');
-  closeMobileDrawer();
+  await window.returnMobileNotesToList?.();
 }
 
 function closeMobileNotesList(){document.querySelector('.notes-sidebar')?.classList.remove('list-open')}
@@ -400,22 +397,14 @@ window.enterNotesEditorHistory=id=>{
 window.addEventListener('popstate',()=>{
   if(!notesEditorHistoryActive)return;
   notesEditorHistoryActive=false;
-  void (async()=>{
-    const saved=window.activeNoteId?await window.saveNote?.({manual:false}):true;
-    if(saved===false){
-      if(window.backupActiveNoteDraft?.()){
-        window.showToast?.('Cloud save failed. Your local draft is kept on this browser; retry when connected.','error');
-        closeMobileDrawer();return;
-      }
-      if(window.confirm('The scroll could not be saved, and a local backup could not be created. Leave the editor anyway?')){
-        closeMobileDrawer();return;
-      }
-      const current=window.history.state&&typeof window.history.state==='object'?window.history.state:{};
-      window.history.pushState({...current,konohaNotesEditor:true,noteId:String(window.activeNoteId||'')},'',window.location.href);
-      notesEditorHistoryActive=true;return;
-    }
-    closeMobileDrawer();
-  })();
+  const returnTask=window.returnMobileNotesToList?.();
+  if(!returnTask)return;
+  void returnTask.then(result=>{
+    if(result?.closed)return;
+    const current=window.history.state&&typeof window.history.state==='object'?window.history.state:{};
+    window.history.pushState({...current,konohaNotesEditor:true,noteId:String(window.activeNoteId||'')},'',window.location.href);
+    notesEditorHistoryActive=true;
+  });
 });
 
 function toggleArchiveSidebar(){

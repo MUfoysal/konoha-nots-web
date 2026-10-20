@@ -14,6 +14,7 @@ import { FirebaseSettingsDataSource } from '../../features/settings/data/datasou
 import { FirebaseSettingsRepository } from '../../features/settings/data/repositories/firebase-settings-repository.js';
 import { SettingsController } from '../../features/settings/presentation/controllers/settings-controller.js';
 import { SHINOBI_AVATARS, parseShinobiAvatar } from '../../features/settings/presentation/avatar-catalog.js?v=20261013-1';
+import { returnToNotesList, startNoteSaveWithRecovery } from '../../features/notes/presentation/mobile-notes-navigation.js?v=20261020-1';
 
 let deleteModalTrigger = null;
 let authController;
@@ -415,12 +416,19 @@ window.openNote = async id => {
   let note = window.notes.find(item => String(item.id) === String(id)); if (!note) return false;
   if (window.activeNoteId && String(window.activeNoteId) !== String(id)) {
     clearTimeout(window.autoSaveTimer);
-    const saved = await window.saveNote({ manual: false });
-    if (!saved) {
-      const backedUp = Boolean(window.backupActiveNoteDraft?.());
-      const reason = noteSaveFailureMessage ? ` Save error: ${noteSaveFailureMessage.replace(/[.!?]+$/, '')}.` : '';
-      const recovery = backedUp ? 'A local recovery copy is saved on this browser.' : 'A local recovery copy could not be confirmed.';
-      if (!window.confirm(`This scroll could not be saved to your account.${reason} ${recovery} Continue opening the other scroll?`)) return false;
+    const pendingSave = startNoteSaveWithRecovery({
+      save: () => window.saveNote({ manual: false }),
+      hasPendingChanges: () => Boolean(window.hasPendingNoteSaves?.()),
+      backupDraft: () => Boolean(window.backupActiveNoteDraft?.()),
+    });
+    if (!pendingSave.hasRecoveryDraft) {
+      const saved = await pendingSave.saveTask;
+      if (saved === false) {
+        const backedUp = Boolean(window.backupActiveNoteDraft?.());
+        const reason = noteSaveFailureMessage ? ` Save error: ${noteSaveFailureMessage.replace(/[.!?]+$/, '')}.` : '';
+        const recovery = backedUp ? 'A local recovery copy is saved on this browser.' : 'A local recovery copy could not be confirmed.';
+        if (!window.confirm(`This scroll could not be saved to your account.${reason} ${recovery} Continue opening the other scroll?`)) return false;
+      }
     }
   }
   if (note.hasRecoveryConflict && note.recoveryDraft) {
@@ -708,6 +716,23 @@ window.backupActiveNoteDraft = () => {
   if (active.changed) markNoteDirty(active.note);
   cancelScheduledLocalNoteDraft(active.note.id);
   return writeLocalNoteDraft(lastUser?.uid, active.note);
+};
+
+window.returnMobileNotesToList = async () => {
+  const result = await returnToNotesList({
+    save: () => window.activeNoteId ? window.saveNote?.({ manual: false }) : true,
+    hasPendingChanges: () => Boolean(window.hasPendingNoteSaves?.()),
+    backupDraft: () => Boolean(window.backupActiveNoteDraft?.()),
+    closeDrawer: () => {
+      document.getElementById('notesEditor')?.classList.remove('drawer-open');
+      document.querySelector('.notes-sidebar')?.classList.remove('drawer-hidden', 'list-open');
+    },
+    confirmLeave: () => window.confirm('This scroll could not be saved, and a local backup could not be created. Leave the editor anyway?'),
+  });
+  if (result.closed && !result.saved && result.hasRecoveryDraft) {
+    window.showToast?.('Cloud save failed. Your local draft is kept on this browser; retry when connected.', 'error');
+  }
+  return result;
 };
 
 window.saveNote = async (options = {}) => {
