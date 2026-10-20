@@ -3282,15 +3282,18 @@ input,textarea,button,select{-webkit-appearance:none;appearance:none;border-radi
   #view-notes .editor-toolbar{padding:10px 16px;gap:8px}
   #view-notes .editor-title-input{flex:1 1 180px;min-width:0}
   #view-notes .toolbar-actions{width:100%;justify-content:flex-end;flex-wrap:wrap}
+  #view-notes .toolbar-btn{min-height:44px}
+  #view-notes .snippet-launch-btn{width:44px;height:44px;flex:0 0 44px}
   #view-notes .format-bar{position:sticky;top:0;z-index:2;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}
-  #view-notes .fmt-btn{flex:0 0 40px;width:40px;height:40px}
+  #view-notes .fmt-btn{flex:0 0 44px;width:44px;height:44px}
   #view-notes .editor-tags{flex:0 0 auto}
   #view-notes .editor-body{flex:1 1 auto;padding:24px 22px;min-height:0}
   #view-notes #note-content-editor{min-height:100%;font-size:1rem}
+  #view-notes #note-content-editor table{display:block;width:100%;max-width:100%;overflow-x:auto}
   #view-notes .wordcount-bar{padding:8px 14px;gap:8px 14px}
 }
 @media(max-width:480px){
-  #view-notes.active{padding-top:52px}
+  #view-notes.active{padding-top:56px}
   #view-notes .notes-sidebar{inset:0}
   #view-notes .notes-sidebar-header{padding:10px 12px 8px}
   #view-notes .notes-filter-tabs{padding:8px 12px;overflow-x:auto}
@@ -3305,10 +3308,11 @@ input,textarea,button,select{-webkit-appearance:none;appearance:none;border-radi
   #view-notes .toolbar-actions{grid-column:1/-1;display:flex;justify-content:space-between;gap:5px}
   #view-notes .toolbar-btn{min-height:44px;padding:6px 8px;font-size:.55rem}
   #view-notes .format-bar{padding:6px 8px}
-  #view-notes .fmt-btn{flex-basis:40px;width:40px;height:40px}
+  #view-notes .fmt-btn{flex-basis:44px;width:44px;height:44px}
   #view-notes .editor-tags{padding:8px 10px;gap:6px}
   #view-notes .tag-input{min-width:90px;min-height:36px}
   #view-notes .editor-body{padding:18px 14px}
+  #view-notes.focus-mode .editor-body{padding-inline:14px}
   #view-notes #note-content-editor{font-size:.98rem;line-height:1.75}
   #view-notes .wordcount-bar{gap:6px 10px;padding:7px 10px;font-size:.68rem}
   #view-notes #lastSaved{margin-left:0;flex:1 1 100%;order:2}
