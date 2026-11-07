@@ -611,7 +611,10 @@ function flushNoteSave(id) {
     return Promise.resolve(false);
   }
   const currentTask = noteSaveTasks.get(id);
-  if (currentTask) return currentTask.then(() => flushNoteSave(id));
+  if (currentTask) return currentTask.then(saved => {
+    if (!saved) return false;
+    return (savedNoteRevisions.get(id) || 0) < (noteRevisions.get(id) || 0) ? flushNoteSave(id) : true;
+  });
   const task = (async () => {
     while ((savedNoteRevisions.get(id) || 0) < (noteRevisions.get(id) || 0)) {
       if (authState !== 'authenticated' || !lastUser?.uid || firebaseServices().auth.currentUser?.uid !== lastUser.uid) {
